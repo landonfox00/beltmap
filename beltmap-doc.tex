@@ -1,0 +1,471 @@
+% Copyright (C) 2026 Landon Fox
+%
+% This work may be distributed and/or modified under the conditions of the
+% LaTeX Project Public License, either version 1.3c of this license or (at your
+% option) any later version. The latest version of this license is in
+%   https://www.latex-project.org/lppl.txt
+% and version 1.3c or later is part of all distributions of LaTeX version
+% 2008 or later.
+%
+% This work has the LPPL maintenance status `maintained'.
+% The Current Maintainer of this work is Landon Fox.
+%
+% This work consists of the files beltmap.sty, tikzlibrarybeltmap.code.tex,
+% beltmap.lua, beltmap-net.lua, beltmap_export.py, beltmap-doc.tex, and the
+% files in examples/.
+
+%!TeX program = lualatex
+% =============================================================================
+% beltmap 0.1                                                        2026-11-19
+%
+% Manual of beltmap.sty. Every picture in it is drawn by the package from the
+% files in examples/, so building it is also the visual test.
+% =============================================================================
+\DocumentMetadata{lang=en-US, pdfstandard=ua-2, pdfversion=2.0, tagging=on, testphase=latest}
+\documentclass[11pt]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{fontspec}
+\usepackage{parskip}
+\usepackage{fancyvrb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{beltmap}
+\usepackage[hidelinks]{hyperref}
+
+\fvset{fontsize=\small, numbers=none, frame=leftline, framerule=0.6pt, rulecolor=\color{black!25}, xleftmargin=4pt}
+\newcommand\cs[1]{\texttt{\textbackslash#1}}
+\newcommand\key[1]{\texttt{#1}}
+\setlength\tabcolsep{5pt}
+
+\title{\textsf{beltmap}: schematic pictures of Factorio belt layouts}
+\date{}
+
+\begin{document}
+	\begin{center}
+		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
+		\smallskip
+		{\large version 0.1, 2026-11-19\par}
+	\end{center}
+
+	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
+
+	\begin{Verbatim}
+\usepackage{beltmap}
+...
+\beltlayout[labels]{examples/f00_9x10.json}
+	\end{Verbatim}
+
+	\begin{center}
+		\beltlayout[labels]{examples/f00_9x10.json}
+	\end{center}
+
+	\section{Reading a picture}
+
+	\begin{tabularx}{\linewidth}{@{}l X@{}}
+		\toprule
+		Glyph & Meaning \\
+		\midrule
+		\beltglyph{belt} & A belt. Every belt between two splitters has its own color, through turns and tunnels. Arrowheads give the direction. \\
+		\beltglyph{splitter} & A splitter over two tiles; the arrow is its direction. \\
+		\beltglyph{entrance} & Underground entrance: a solid hood over the half of the tile that faces the tunnel, narrowing toward it. \\
+		\beltglyph{exit} & Underground exit: the same hood, open, the belt leaving its mouth. \\
+		\beltglyph{tunnel} & The tunnel: chevrons in the belt's color, pointing the way items travel. \\
+		\beltglyph{input priority} & Input priority: a triangle at the input edge on the preferred side. \\
+		\beltglyph{output priority} & Output priority: a triangle at the output edge on the preferred side. \\
+		\beltglyph{filter} & Filter: a diamond where the filtered item leaves; the rest leaves on the other side. One diamond color per item. \\
+		\beltglyph[tier=red, trim]{splitter} \beltglyph[tier=red, trim]{entrance} & Belt tier: a rim on splitters and a bar over a hood's mouth, in the tier's color (yellow, red, blue, turbo green). \\
+		\beltglyph{side-load} & Side-loading: a belt that ends against the side of another. \\
+		\bottomrule
+	\end{tabularx}
+
+	Left and right are those of somebody travelling with the belt. The shaded lines of tiles are the entry and exit lines, when the layout has them. The glyphs above are \cs{beltglyph}, which sets one glyph in running text: \verb|\beltglyph{entrance}| gives \beltglyph{entrance}.
+
+	\section{Front ends}
+
+	\subsection{Files: \cs{beltlayout}}
+
+	\verb|\beltlayout[keys]{file}| reads, by the file's extension:
+	\begin{itemize}
+		\item \texttt{.json}: tiles in Factorio-SAT's format, the bare list \texttt{tiles[y][x]} or an object \texttt{\{"tiles": ..., "gap": 4, "inputs": [...], "outputs": [...], "tier": ...\}};
+		\item \texttt{.jsonl}: search records; the smallest record with status \texttt{sat}, or the one picked by \key{pick} (network file) and \key{record} (counted from 0);
+		\item anything else: a blueprint string, a blueprint book, or the JSON inside one; \key{index} (from 0) or \key{label} (part of the label) picks a blueprint of a book.
+	\end{itemize}
+	Directions are numbered 8 ways in Factorio 1.1 and 16 ways in 2.0; the blueprint's \texttt{version} field decides, and \key{factorio=1.1} or \key{factorio=2.0} overrides it. A 2.0 splitter filter is an object with \texttt{name}, \texttt{quality} and \texttt{comparator}, and the game leaves out the last two when the filter takes any quality. It is read as its item name, with a note when the quality is not plain normal, as in \emph{copper-ore (any quality)}, and written back as it was read.
+
+	\begin{Verbatim}
+\beltlayout[labels, flow=right]{examples/f04_11x8.txt}
+	\end{Verbatim}
+	\begin{center}
+		\beltlayout[labels, flow=right]{examples/f04_11x8.txt}
+	\end{center}
+
+	\subsection{Strings: \cs{beltblueprint}}
+
+	A blueprint string pasted into the document. Line breaks and spaces inside it are ignored.
+
+	\begin{Verbatim}
+\beltblueprint[inputs={A,B}, outputs={left, right}]{0eNqtkMEKwjAQRH9F9rxKGxuh+RU
+  RaXXVQJqEZCtK6b8bFUWsPYiewmZ2HrPTQW1a8kFbBtWBZmpAvfwhkGXNmiKoZXcfzmvbNjUFUDmCdzH
+  ...}
+	\end{Verbatim}
+	\begin{center}
+		\beltblueprint[inputs={A,B}, outputs={left, right}, tile=6mm]{0eNqtkMEKwjAQRH9F9rxKGxuh+RURaXXVQJqEZCtK6b8bFUWsPYiewmZ2HrPTQW1a8kFbBtWBZmpAvfwhkGXNmiKoZXcfzmvbNjUFUDmCdzHJzl7dJ1DZTCKcb2+PsNWBNne1QLBVQwnOobLRu8DTmgxDjwOsGGDFP7Dz0bT5L9higM2f2GwMG73RzMmOoK1veZ3qdiFhk2Zody3etfwmBL0/fIwgRwv74rIVwpFCvG3JhSiLspRSyMVcZAimSkvJ9EgzeR7Q9xciZMEQ}
+	\end{center}
+
+	\subsection{Typed grids: \texttt{beltgrid}}
+
+	One cell per tile, cells separated by spaces, rows by \verb|\\|. Keep a space between two \verb|^| cells: TeX reads \verb|^^| as a character code.
+
+	\begin{center}
+		\begin{tabular}{@{}ll@{\qquad}ll@{}}
+			\toprule
+			Cell & Tile & Cell & Tile \\
+			\midrule
+			\verb|>| \verb|<| \verb|^| \verb|v| & belt & \verb|S>| & a splitter tile, on both tiles \\
+			\verb|I>| & underground entrance & \verb|S>[in=left]| & with options, on either tile \\
+			\verb|O>| & underground exit & \verb|. | or \verb|_| & empty \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	Splitter options are \key{in} and \key{out} (\key{left} or \key{right}) and \key{filter} (an item name); the filtered item leaves on the \key{out} side, left when \key{out} is not set. The tiles of a splitter facing right or left are stacked, those facing up or down sit side by side. A belt turns as in the game: when exactly one belt feeds it from a side and none from behind.
+
+	\begin{minipage}[c]{0.56\linewidth}
+		\begin{Verbatim}[fontsize=\footnotesize]
+\begin{beltgrid}[inputs={mixed ore, iron ore},
+    outputs={iron ore, overflow, copper ore}]
+ >  S>[filter=iron-ore, out=right] > v .  .  ...\\
+ .  S>  I> v O> S>[in=left] > S>[out=left] >  \\
+ >  >   I> v O> S>          . S>           >  \\
+ .  .   .  > >  >           > >            >
+\end{beltgrid}
+		\end{Verbatim}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.42\linewidth}
+		\centering
+		\begin{beltgrid}[inputs={mixed ore, iron ore}, outputs={iron ore, overflow, copper ore}, tile=4mm]
+			>  S>[filter=iron-ore, out=right]  >   v  .   .           .  .           .  \\
+			.  S>                              I>  v  O>  S>[in=left]  >  S>[out=left]  >  \\
+			>  >                               I>  v  O>  S>           .  S>           >  \\
+			.  .                               .   >  >   >            >  >            >
+		\end{beltgrid}
+	\end{minipage}
+
+	\subsection{By hand: the TikZ library}
+
+	\verb|\usetikzlibrary{beltmap}| works without the package, in any engine. One unit is one tile and $y$ points up; \verb|(tile cs:x=3,y=5)| or \verb|\bmtile{3}{5}| is the center of the tile in column 3, row 5, counted from the top left as in Factorio-SAT. The glyphs are pics whose argument names a direction and options: \texttt{bm head}, \texttt{bm entrance}, \texttt{bm exit}, and \texttt{bm splitter}, placed at the middle of its two tiles. Belts are paths with the style \texttt{bm belt=}\textit{color}; \texttt{bmc0} to \texttt{bmc11} are the colors of the palette.
+
+	\begin{minipage}[c]{0.6\linewidth}
+		\begin{Verbatim}[fontsize=\footnotesize]
+\begin{tikzpicture}[bm tile=6mm, bm theme=schematic]
+  \path[bm belt=bmc0] (0,-0.5) -- (1.5,-0.5);
+  \path[bm belt=bmc1] (0,-1.5) -- (1.5,-1.5);
+  \pic at (1.5,-1) {bm splitter={right, out=left}};
+  \path[bm belt=bmc2] (1.5,-0.5) -- (3,-0.5);
+  \path[bm belt=bmc3] (1.5,-1.5) -- (2.5,-1.5);
+  \pic at (2.5,-1.5) {bm entrance=right};
+  \node[bm label, anchor=west] at (3,-0.5) {first};
+  \draw[red, thick, <-] (2.5,-1.8) -- ++(0,-0.6)
+    node[below, font=\scriptsize] {goes under};
+\end{tikzpicture}
+		\end{Verbatim}
+	\end{minipage}\hfill
+	\begin{minipage}[c]{0.38\linewidth}
+		\centering
+		\begin{tikzpicture}[bm tile=6mm, bm theme=schematic, alt={A splitter with output priority left; its right output goes underground.}]
+			\path[bm belt=bmc0] (0,-0.5) -- (1.5,-0.5);
+			\path[bm belt=bmc1] (0,-1.5) -- (1.5,-1.5);
+			\pic at (1.5,-1) {bm splitter={right, out=left}};
+			\path[bm belt=bmc2] (1.5,-0.5) -- (3,-0.5);
+			\path[bm belt=bmc3] (1.5,-1.5) -- (2.5,-1.5);
+			\pic at (2.5,-1.5) {bm entrance=right};
+			\node[bm label, anchor=west] at (3,-0.5) {first};
+			\draw[red, thick, <-] (2.5,-1.8) -- ++(0,-0.6) node[below, font=\scriptsize] {goes under};
+		\end{tikzpicture}
+	\end{minipage}
+
+	Pictures from the other front ends take TikZ code through the key \key{annotate}, drawn after the layout in the same coordinates:
+	\begin{Verbatim}
+\beltlayout[annotate={\draw[red, very thick, rounded corners=2pt]
+    (tile cs:x=1,y=4) ++(-0.55,0.55) rectangle ++(1.1,-1.1);}]{...}
+	\end{Verbatim}
+
+	\section{Themes}
+
+	\key{theme} sets the look; the drawing does not change. The same layout, \texttt{f05\_11x8.txt}, in each:
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[tile=3.6mm, annotate={\draw[red, very thick, rounded corners=2pt] (tile cs:x=3,y=4) ++(-0.55,0.55) rectangle ++(1.1,-1.1);}]{examples/f05_11x8.txt} & \beltlayout[theme=transit, tile=3.6mm]{examples/f05_11x8.txt} \\
+			\small\key{schematic} (the default; with an \key{annotate} box) & \small\key{transit} \\[10pt]
+			\beltlayout[theme=print, tile=3.6mm]{examples/f05_11x8.txt} & \beltlayout[theme=dark, tile=3.6mm]{examples/f05_11x8.txt} \\
+			\small\key{print}: black ink, both lanes of each belt & \small\key{dark} \\
+		\end{tabular}
+
+		\bigskip
+		\beltlayout[theme=industrial, tile=6.4mm, labels]{examples/f05_11x8.txt}
+
+		\small\key{industrial}: after the feel of the game, drawn from scratch without its graphics
+	\end{center}
+
+	\key{industrial} draws each belt as a dark track with slats between two rails in the belt's color, splitters and underground belts as steel housings striped in their tier's color (yellow when the layout names none), and hazard stripes on the entry and exit lines.
+
+	\section{Keys}
+
+	Keys go in the optional argument of each command, in \verb|\beltmapset{...}| for the rest of the group, or as package options.
+
+	\begin{tabularx}{\linewidth}{@{}l l X@{}}
+		\toprule
+		Key & Default & Effect \\
+		\midrule
+		\key{theme} & \key{schematic} & \key{schematic}, \key{dark}, \key{transit}, \key{print}, or \key{industrial} \\
+		\key{tile} & \key{4.4mm} & size of one tile \\
+		\key{labels} & \key{false} & number the inputs and outputs \\
+		\key{inputs}, \key{outputs} & & labels, in order from top to bottom or left to right; braces protect a comma \\
+		\key{flow} & as drawn & \key{right}, \key{up}, \key{left}, or \key{down}: turn the layout to run that way \\
+		\key{tier} & & \key{yellow}, \key{red}, \key{blue}, or \key{turbo} for tiles that name none; turns the trim on \\
+		\key{trim} & \key{auto} & show tier colors on splitters and hoods, yellow for tiles without a tier; \key{auto} shows them when a tier is given or tiers are mixed, and always in \key{industrial} \\
+		\key{color} & \key{belt} & \key{belt}: one color per belt; \key{tier}: the color of its tier \\
+		\key{mix} & \key{none} & \key{blend} (alone, \key{mix} means this) or \key{bands}: color each belt by the inputs it carries, and judge the balance (section~\ref{sec:mix}) \\
+		\key{mix lanes} & \key{false} & color the two lanes of each belt on their own (section~\ref{sec:lanes}) \\
+		\key{focus} & & an input number: shade each belt by how much of that input it carries \\
+		\key{palette} & \key{wheel} & \key{wheel}, \key{okabe-ito}, \key{lightness}, or \key{gray} (the default in \key{print}) \\
+		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}: stop when the layout is not so (section~\ref{sec:exact}) \\
+		\key{throughput} & \key{false} & run the max-flow test and mark the cut (section~\ref{sec:tp}) \\
+		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}) \\
+		\key{numbers} & \key{false} & splitter numbers on the layout, as in the graph \\
+		\key{compare} & & a layout file: mark the tiles that differ from it \\
+		\key{step} & & one step of the flow, as in \cs{beltanimation} \\
+		\key{columns}, \key{limit} & 3, all & cells per row and number of records of \cs{beltgallery} \\
+		\key{lanes} & \key{false} & a line between the two lanes of each belt (always on in \key{print}) \\
+		\key{grid} & \key{true} & the tile grid: \key{faint}, \key{true} (normal), \key{strong} (over the entry and exit lines too), or \key{false} (section~\ref{sec:count}) \\
+		\key{grid major} & & a heavier line every $n$ tiles, counted from the inside corner \\
+		\key{rulers} & & number the tiles of the inside along the top and left; \key{rulers=5}: every fifth \\
+		\key{dimensions} & \key{false} & the size of the inside in tiles, below and to the left \\
+		\key{ends}, \key{heads} & \key{true} & the shaded entry and exit lines, the arrowheads \\
+		\key{gap} & file, else 10 & longest tunnel for tiles without a tier \\
+		\key{pick}, \key{record} & & which search record of a \texttt{.jsonl} file \\
+		\key{index}, \key{label}, \key{factorio} & & which blueprint of a book; direction numbering, read and written \\
+		\key{blueprint} & \key{none} & \key{file}: write the picture's blueprint string beside the PDF; \key{attach} (alone, \key{blueprint} means this): also attach it to the PDF (section~\ref{sec:out}) \\
+		\key{blueprint label} & read, else \emph{Belt layout} & the label of the written blueprint \\
+		\key{alt} & generated & alternative text in a tagged PDF \\
+		\key{annotate} & & TikZ code drawn after the layout \\
+		\key{tikz} & & options for the \texttt{tikzpicture} \\
+		\bottomrule
+	\end{tabularx}
+
+	\section{Splitter options in four directions}
+
+	% A grid made by a macro is expanded once before beltgrid reads it as text.
+	\newcommand\splgrid[1]{\begin{beltgrid}[grid=false, ends=false, heads=false, tile=4.6mm, tikz={baseline=(current bounding box.center)}]#1\end{beltgrid}}
+	\newcommand\splcell[1]{\expandafter\splgrid\expandafter{#1}}
+	\newcommand\splrow[2]{%
+		#1 &
+		\splcell{#2{in=left}} & \splcell{#2{in=right}} & \splcell{#2{out=left}} & \splcell{#2{out=right}} & \splcell{#2{filter=a, out=left}} & \splcell{#2{filter=b, out=right}} & \splcell{#2{in=left, out=right}}}
+	\newcommand\gridR[1]{> S>[#1] > \\ > S> >}
+	\newcommand\gridL[1]{< S<[#1] < \\ < S< <}
+	\newcommand\gridU[1]{^ ^ \\ S^[#1] S^ \\ ^ ^}
+	\newcommand\gridD[1]{v v \\ Sv[#1] Sv \\ v v}
+
+	\begin{center}
+		\small
+		\begin{tabular}{@{}l ccccccc@{}}
+			\toprule
+			& in left & in right & out left & out right & filter left & filter right & in left, out right \\
+			\midrule
+			\splrow{right}{\gridR} \\[10pt]
+			\splrow{up}{\gridU} \\[10pt]
+			\splrow{left}{\gridL} \\[10pt]
+			\splrow{down}{\gridD} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\section{Counting tiles}
+	\label{sec:count}
+
+	The size of a layout is counted inside its entry and exit lines, as the search records count it. \key{grid} sets how much the tile grid shows, from \key{faint} to \key{strong}, which also runs over the entry and exit lines. \key{grid major=5} draws a heavier line every five tiles from the inside corner, \key{rulers} numbers the inside tiles along the top and left (every one, or every fifth with \key{rulers=5}), and \key{dimensions} marks the inside size in tiles. \cs{beltmapcaption} gives the same size in words.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{\qquad}c@{}}
+			\beltlayout[grid=faint, tile=3.2mm]{examples/f00_9x10.json} &
+			\beltlayout[grid=strong, tile=3.2mm]{examples/f00_9x10.json} &
+			\beltlayout[grid=strong, grid major=5, rulers, dimensions, tile=3.6mm]{examples/f00_9x10.json} \\
+			\small\key{grid=faint} & \small\key{grid=strong} & \small\key{grid=strong, grid major=5, rulers, dimensions}
+		\end{tabular}
+	\end{center}
+
+	\section{Tiers, lanes, and flow}
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[tier=blue, tile=3.6mm]{examples/f01_9x10.json} & \beltlayout[tier=red, color=tier, lanes, tile=3.6mm]{examples/f01_9x10.json} \\
+			\small\key{tier=blue} & \small\key{tier=red, color=tier, lanes}
+		\end{tabular}
+
+		\bigskip
+		\begin{tabular}{@{}c@{\quad}c@{\quad}c@{\quad}c@{}}
+			\beltlayout[flow=right, tile=2.6mm]{examples/f04_11x8.txt} &
+			\beltlayout[flow=up, tile=2.6mm]{examples/f04_11x8.txt} &
+			\beltlayout[flow=left, tile=2.6mm]{examples/f04_11x8.txt} &
+			\beltlayout[flow=down, tile=2.6mm]{examples/f04_11x8.txt} \\
+			\small\key{flow=right} & \small\key{up} & \small\key{left} & \small\key{down}
+		\end{tabular}
+	\end{center}
+
+	\section{Mixing: is it a balancer?}
+	\label{sec:mix}
+
+	With \key{mix}, each input carries an item of its own color, and every belt is colored by what it carries. The flow is computed exactly from the trace. Each input feeds one unit; a splitter sends half of what enters it out of each side, all of it to its output-priority side, or all of it to its one side that leads anywhere; a side-load adds to the belt it joins; a belt that leads nowhere carries nothing. A loop fed only through output-priority sides takes items in and lets none out; in the game it fills, and its splitter then sends everything to the other side. beltmap finds such loops, as sets of belts that no flow leaves, and counts them full. A layout is \emph{balanced} when each of its $m$ outputs carries $1/m$ of every input, and then all its outputs look alike. \cs{beltmapverdict} holds the verdict on the last picture, the alternative text includes it, and the log lists what each output carries.
+
+	\key{mix=blend} paints each belt with the average of its input colors, taken in the OKLab color space. The input colors lie evenly round a circle of hues, so the even blend of all of them is gray: a balancer ends in gray belts, and a tinted output names the inputs it carries too much of. Two different mixes can blend to nearly the same color, so a blend illustrates and \key{mix=bands} checks. Bands draw each belt as stripes, a pair per input, each pair as wide as that input's share of the belt; the outputs of a balancer carry the same stripes in the same widths.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\begin{beltgrid}[mix, labels, tile=4.4mm]
+				> S> > > > \\
+				> S> > S> > \\
+				> S> > S> > \\
+				> S> > > >
+			\end{beltgrid}
+			&
+			\begin{beltgrid}[mix=bands, labels, tile=4.4mm]
+				> S> > > > \\
+				> S> > S> > \\
+				> S> > S> > \\
+				> S> > > >
+			\end{beltgrid}
+			\\
+			\multicolumn{2}{@{}c@{}}{\small\key{mix} and \key{mix=bands}: \beltmapverdict}
+			\\[10pt]
+			\beltlayout[mix, labels, tile=3.6mm]{examples/f00_9x10.json}
+			&
+			\beltlayout[mix=bands, labels, tile=3.6mm, blueprint, blueprint label={f00: 5-5 balancer}]{examples/f00_9x10.json}
+			\\
+			\multicolumn{2}{@{}c@{}}{\small\beltmapverdict}
+		\end{tabular}
+	\end{center}
+
+	\section{Exact shares, claims, and captions}
+	\label{sec:exact}
+
+	The shares are computed in exact fractions, and in floating point only when the fractions outgrow 62 bits. After each picture, \cs{beltmapmatrix} sets them as a table, a row per input and a column per output. \key{expect} turns a claim of the text into a check: the document stops with an error when the layout is not what it says. It takes \key{balanced}, \key{unbalanced}, \key{lanes} (section~\ref{sec:lanes}), \key{throughput}, or \key{limited} (section~\ref{sec:tp}), or a list of them. \key{expect} works without \key{mix}: it computes what it checks.
+
+	\cs{beltmapcaption} is a one-line summary of the last picture: inputs and outputs, the size between the entry and exit lines, splitters, tunnels, and every verdict the picture computed. It is the same size the search records give as their area.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[mix, labels, tile=3.6mm, expect={balanced, throughput}]{examples/f00_9x10.json} & \beltmapmatrix \\[4pt]
+			\multicolumn{2}{@{}c@{}}{\small\beltmapcaption}
+		\end{tabular}
+	\end{center}
+
+	\section{Throughput}
+	\label{sec:tp}
+
+	A balancer can balance and still not pass full belts: a belt that every input must cross caps them all. \key{throughput} runs the max-flow test. Every lane is given a capacity of one, every choice of open inputs $I$ and outputs $O$ is tried, and a choice is \emph{limited} when less than $\min(|I|, |O|)$ belts can get through. A limited choice is proved limited: the test finds a \emph{cut}, a set of lanes whose removal separates $I$ from $O$, with less capacity than the choice needs. The picture shows the cut of the worst choice glowing under its belts, and \cs{beltmapthroughput} holds the verdict. Passing the test is necessary for a throughput-unlimited balancer, not sufficient: a splitter does not route along a maximum flow, and the steady states that decide it (\texttt{design-methods/tu.py} of this project) need a mixed-integer program that LuaTeX does not have. Up to 4096 choices are tried; beyond that, only the choices with as many outputs as inputs.
+
+	\begin{center}
+		\begin{beltgrid}[mix, throughput, labels, tile=6mm, expect={balanced, limited}]
+			> S> > S> > \\
+			> S> . S> >
+		\end{beltgrid}\par\smallskip
+		\small balanced, but \beltmapthroughput
+	\end{center}
+
+	\section{Lanes, focus, and palettes}
+	\label{sec:lanes}
+
+	The shares are traced lane by lane: belts, turns, underground belts, and splitters keep each lane, and a side-load puts both lanes of the incoming belt onto the near lane of the belt it joins. \key{mix lanes} colors the two lanes of each belt on their own, and \cs{beltmaplanes} says whether the lanes are kept: whether each output lane carries $1/m$ of each input lane on its own side and nothing of the other. \key{expect=lanes} checks it.
+
+	\key{focus=$i$} follows one input: each belt is shaded by how much of it is input $i$, and the output labels give the share of input $i$ that reaches each output. \key{palette} picks the input colors. \key{wheel}, the default, puts the hues evenly round a circle, so the even blend is gray. \key{okabe-ito} uses Okabe and Ito's colors for readers with color blindness. \key{lightness} runs from dark blue to light yellow, told apart by lightness alone. \key{gray} runs from black to light gray, and is the default in \key{print}. Away from \key{wheel}, a balancer's outputs still look alike, but their color is not gray.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\quad}c@{\quad}c@{}}
+			\begin{beltgrid}[mix, mix lanes, tile=7mm, labels]
+				. v . . \\
+				> > > >
+			\end{beltgrid}
+			&
+			\beltlayout[focus=2, labels, tile=3.2mm]{examples/f00_9x10.json}
+			&
+			\beltlayout[mix=bands, palette=lightness, tile=3.2mm]{examples/f00_9x10.json}
+			\\
+			\small\key{mix lanes}: a side-load & \small\key{focus=2} & \small\key{palette=lightness}
+		\end{tabular}
+	\end{center}
+
+	\section{The splitter graph}
+	\label{sec:graph}
+
+	\key{view=graph} draws the network instead of the layout, with none of the layout's positions. Each input, splitter, and output is a node, and so is every point where a belt side-loads. Each piece of belt is an arrow, in the color the layout gives it, \key{mix} included. The inputs stand in a column on the left and the outputs in one on the right. Each splitter takes the column of its longest path from the inputs, once the loops are cut. A force layout then sets the heights: every pair of nodes repels, every belt pulls its ends together, and the inputs and outputs fall in whatever order this gives. Arrows leave a node to the right and enter the next from the left, each at a point of its own, and an arrow that closes a loop swings round below or above. \key{numbers} writes each splitter's number on the layout in place of its arrow, the number its node carries in the graph.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[mix, numbers, labels, tile=3.6mm]{examples/f00_9x10.json}
+			&
+			\beltlayout[mix, view=graph]{examples/f00_9x10.json}
+		\end{tabular}
+	\end{center}
+
+	\section{Comparing two layouts}
+
+	\key{compare=}\emph{file} draws the layout and marks how it differs from the layout in the file. Tiles the other layout lacks are shaded green, tiles that hold something else are shaded amber, and tiles only the other layout uses are outlined in red. The two are lined up by their top left entities; \key{flow} turns both.
+
+	\begin{center}
+		\beltlayout[compare=examples/f00_9x10.json, labels, tile=3.6mm]{examples/f01_9x10.json}\par\smallskip
+		\small f01 compared with f00: \beltmapcaption
+	\end{center}
+
+	\section{Blueprints out}
+	\label{sec:out}
+
+	Every picture also has a blueprint: after each one, \cs{beltmapstring} holds the blueprint string of the layout as drawn (turned by \key{flow}, tiers given by \key{tier}), and \verb|\beltmapprintstring[width]| sets it in small type that may break after any character. The string uses Factorio 2.0's numbering unless \key{factorio=1.1} is given or the layout was read from a 1.1 string; tiles without a tier become plain (yellow) entities. With \key{blueprint=file} the string is also written to \texttt{\textbackslash jobname-blueprint-}\emph{n}\texttt{.txt}, and with \key{blueprint} it is moreover attached to the PDF, where a viewer lists it among the attachments. Copying the attachment, or the file, is the safe way into the game: text copied from the page may carry line breaks.
+
+	A blueprint stores no belt turns: the game works them out from the neighbors. Each string is read back as soon as it is written, and a layout whose turns would come out differently in the game draws a warning. On every example the string reads back to the same layout, and for the examples that are blueprint strings it holds the same entities as the string it came from.
+
+	The strings were tested in Factorio 2.1.24 (with Space Age), headless. A small mod imported each string, built it, read every entity back through the game's API (name, tile, direction, belt shape, underground type and partner, splitter priorities and filter), and exported a blueprint of what it built; beltmap's reading of the string was compared with the entities, and its reading of the export with the entities. All 53 cases passed, in 2.0 and 1.1 numbering, among them grids with every tier, every direction, turns, underground belts at full reach, priorities, and filters.
+
+	\begin{center}
+		\begin{beltgrid}[mix, blueprint=none, tile=4.4mm]
+			> S>[in=left, out=right] > \\
+			> S> >
+		\end{beltgrid}\par\smallskip
+		\beltmapprintstring[0.6\linewidth]
+	\end{center}
+
+	\section{Books, galleries, and pictures outside \LaTeX}
+
+	\verb|\beltmapbook[label]| collects every blueprint written with \key{blueprint=file} or \key{blueprint} into one blueprint book. At the end of the document the book goes to \texttt{\textbackslash jobname-book.txt} and, attached to the PDF, into the viewer's attachments. One paste brings every layout of the document into the game.
+
+	\verb|\beltgallery[keys]{file.jsonl}| draws every record with status \texttt{sat} of a search file: \key{columns} cells to a row (3 by default), each with its network file, size and area, and \cs{beltmapcaption}. \key{pick} keeps one network file and \key{limit} the first so many records; the other keys apply to every cell.
+
+	\verb|\beltanimation[keys]{file}| draws one picture per step of the flow. The first has empty belts; each step moves the inputs' colors one piece of belt on, and the last is the steady state. \key{step=}$k$ draws a single step. The script \texttt{beltmap\_export.py} makes files for posting outside \LaTeX: a PNG (\texttt{--png}, at \texttt{--dpi}), an SVG with text as paths (\texttt{--svg}), or an animated GIF of the steps (\texttt{--gif}). For example:
+
+	\begin{Verbatim}[fontsize=\small]
+python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.gif
+	\end{Verbatim}
+
+	\begin{center}
+		\beltanimation[tile=1.9mm, grid=false]{examples/f00_9x10.json}
+	\end{center}
+
+	\section{Accessibility}
+
+	In a tagged document (\verb|\DocumentMetadata{tagging=on, ...}|) every picture is a figure with alternative text. Without \key{alt}, the text is generated from the trace, for instance: \emph{Belt layout of 9 by 10 tiles with 11 splitters and 3 underground tunnels; 5 inputs enter on the left and 5 outputs leave on the right.} With \key{mix}, \key{mix lanes}, \key{throughput}, or \key{compare} it also gives their verdicts; \key{alt} replaces it. This manual is built tagged and passes veraPDF's PDF/UA-2 profile.
+
+	\section{Installing}
+
+	Put \texttt{beltmap.sty}, \texttt{beltmap.lua}, \texttt{beltmap-net.lua}, and \texttt{tikzlibrarybeltmap.code.tex} where LuaLaTeX finds them: beside the document, or in \texttt{tex/latex/beltmap} of a local \texttt{texmf} tree.
+
+	\section{Known limitations}
+
+	\begin{itemize}
+		\item LuaLaTeX only: the package stops with a message under pdf\LaTeX{} or Xe\LaTeX. The TikZ library alone runs anywhere.
+		\item A side-load onto an underground belt is traced as one onto a belt, onto the near lane; the game's rule there was not checked. No layout with a side-load was measured in the game.
+		\item Blueprints were tested in Factorio 2.1.24 only. Strings in 1.1 numbering went through that version's import, not into Factorio 1.1, and no 2.0 release was tried. Written in 1.1 numbering, a filter loses its quality, which 1.1 does not have.
+		\item Entities other than belts, underground belts, and splitters are left out, and counted in the log.
+		\item Labels of a layout that runs up or down overlap when longer than a tile is wide.
+		\item In \key{transit}, belts carry no arrowheads; direction shows on splitters and portals only.
+		\item \key{mix} has no belt capacity: it judges whether a layout balances, and \key{throughput} only runs the max-flow test, which is necessary for full throughput but not sufficient. Filters are ignored: every item is the same item.
+	\end{itemize}
+\end{document}

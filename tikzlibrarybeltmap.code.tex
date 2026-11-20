@@ -1,0 +1,390 @@
+% Copyright (C) 2026 Landon Fox
+%
+% This work may be distributed and/or modified under the conditions of the
+% LaTeX Project Public License, either version 1.3c of this license or (at your
+% option) any later version. The latest version of this license is in
+%   https://www.latex-project.org/lppl.txt
+% and version 1.3c or later is part of all distributions of LaTeX version
+% 2008 or later.
+%
+% This work has the LPPL maintenance status `maintained'.
+% The Current Maintainer of this work is Landon Fox.
+%
+% This work consists of the files beltmap.sty, tikzlibrarybeltmap.code.tex,
+% beltmap.lua, beltmap-net.lua, beltmap_export.py, beltmap-doc.tex, and the
+% files in examples/.
+
+% tikzlibrarybeltmap.code.tex: glyphs and themes of beltmap.
+%
+% Usable on its own with \usetikzlibrary{beltmap} for hand-drawn pictures; beltmap.sty
+% loads it and writes the same commands from a traced layout. One unit is one tile,
+% y upwards. Every glyph is a pic at a tile center (a splitter at the middle of its two
+% tiles) whose argument names a direction and options; the look comes only from the
+% styles that a theme sets, so a picture changes theme by one key.
+\usetikzlibrary{decorations.markings,backgrounds,arrows.meta}
+% The arcs of view=graph lie on a layer of their own, under the nodes and over the ground.
+\pgfdeclarelayer{bmarcs}
+\pgfsetlayers{background,bmarcs,main}
+
+\newdimen\bmunit
+\bmunit=4.4mm
+
+\definecolor{bmt-yellow}{RGB}{240,184,32}
+\definecolor{bmt-red}{RGB}{226,66,50}
+\definecolor{bmt-blue}{RGB}{64,150,236}
+\definecolor{bmt-turbo}{RGB}{132,204,56}
+
+% Filter diamonds: one color per item, in this order.
+\definecolor{bmf0}{RGB}{236,80,196}
+\definecolor{bmf1}{RGB}{64,204,224}
+\definecolor{bmf2}{RGB}{255,140,44}
+\definecolor{bmf3}{RGB}{156,224,70}
+\definecolor{bmf4}{RGB}{168,128,255}
+\definecolor{bmf5}{RGB}{240,240,240}
+
+% Belt colors of the palette, for hand-drawn pictures: bmc0 to bmc11.
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmc10}{RGB}{124,178,71}
+\definecolor{bmc11}{RGB}{198,19,161}
+
+% ---------------------------------------------------------------------- glyph options
+\def\bm@reset{%
+	\def\bm@number{}\def\bm@dir{0}\def\bm@in{}\def\bm@out{}\def\bm@filter{}\def\bm@trim{}\def\bm@fcolor{bmf0}%
+}
+\def\bm@side#1{\ifx#1\bm@left 0.5\else -0.5\fi}
+\def\bm@left{left}
+\pgfkeys{
+	/beltmap/glyph/.is family,
+	/beltmap/glyph,
+	right/.code={\def\bm@dir{0}},
+	up/.code={\def\bm@dir{90}},
+	left/.code={\def\bm@dir{180}},
+	down/.code={\def\bm@dir{270}},
+	dir/.code={\pgfkeys{/beltmap/glyph/#1}},
+	in/.store in=\bm@in,
+	out/.store in=\bm@out,
+	filter/.code={\def\bm@filter{#1}},
+	filter color/.store in=\bm@fcolor,
+	trim/.store in=\bm@trim,
+	number/.store in=\bm@number,
+}
+\def\bm@set#1{\bm@reset\pgfqkeys{/beltmap/glyph}{#1}}
+
+% ---------------------------------------------------------------------- glyphs
+% An underground belt: a hood over the half of the tile that faces the tunnel. The mouth
+% (wide end) faces the surface belt; an entrance's tunnel runs ahead, an exit's behind.
+\tikzset{
+	bm entrance/.pic={
+		\bm@set{#1}
+		\begin{scope}[rotate=\bm@dir]
+			\path[bm hood entrance] (-0.06,0.31) -- (0.42,0.19) -- (0.42,-0.19) -- (-0.06,-0.31) -- cycle;
+			\path[bm hood mark] (0.13,0.075) -- (0.215,0) -- (0.13,-0.075);
+			\ifx\bm@trim\pgfutil@empty\else\path[bm trim bar=bmt-\bm@trim] (-0.06,0.31) -- (-0.06,-0.31);\fi
+		\end{scope}
+	},
+	bm exit/.pic={
+		\bm@set{#1}
+		\begin{scope}[rotate=\bm@dir]
+			\path[bm hood exit] (0.06,0.31) -- (-0.42,0.19) -- (-0.42,-0.19) -- (0.06,-0.31) -- cycle;
+			\path[bm hood mark exit] (-0.225,0.075) -- (-0.14,0) -- (-0.225,-0.075);
+			\ifx\bm@trim\pgfutil@empty\else\path[bm trim bar=bmt-\bm@trim] (0.06,0.31) -- (0.06,-0.31);\fi
+		\end{scope}
+	},
+	% A splitter, placed at the middle of its two tiles; left is the tile on the left of
+	% somebody travelling in its direction. Marks are placed by coordinates in the rotated
+	% frame (a shift= would not turn with it).
+	bm splitter/.pic={
+		\bm@set{#1}
+		\begin{scope}[rotate=\bm@dir]
+			\ifx\bm@trim\pgfutil@empty
+				\path[bm splitter body] (-0.34,-0.84) rectangle (0.34,0.84);
+			\else
+				\path[bm splitter body, bm trim=bmt-\bm@trim] (-0.34,-0.84) rectangle (0.34,0.84);
+			\fi
+			% numbers=true: the splitter's number in place of its arrow (text stays upright).
+			\ifx\bm@number\pgfutil@empty
+				\path[bm splitter arrow] (0.16,0) -- (-0.1,0.13) -- (-0.1,-0.13) -- cycle;
+			\else
+				\node[bm splitter number] at (0,0) {\bm@number};
+			\fi
+			\ifx\bm@in\pgfutil@empty\else
+				\edef\bm@s{\bm@side\bm@in}\path[bm prio] (-0.30,{\bm@s+0.17}) -- (-0.30,{\bm@s-0.17}) -- (-0.04,\bm@s) -- cycle;
+			\fi
+			\ifx\bm@filter\pgfutil@empty
+				\ifx\bm@out\pgfutil@empty\else
+					\edef\bm@s{\bm@side\bm@out}\path[bm prio] (0.04,{\bm@s+0.17}) -- (0.04,{\bm@s-0.17}) -- (0.30,\bm@s) -- cycle;
+				\fi
+			\else
+				% The filtered item leaves on the output-priority side, left when none is set.
+				\ifx\bm@out\pgfutil@empty\def\bm@out{left}\fi
+				\edef\bm@s{\bm@side\bm@out}\path[bm filter=\bm@fcolor] (0.135,{\bm@s+0.17}) -- (0.305,\bm@s) -- (0.135,{\bm@s-0.17}) -- (-0.035,\bm@s) -- cycle;
+			\fi
+		\end{scope}
+	},
+	bm head/.pic={
+		\bm@set{#1}
+		\path[bm head, rotate=\bm@dir] (0.09,0) -- (-0.055,0.08) -- (-0.055,-0.08) -- cycle;
+	},
+}
+
+% ---------------------------------------------------------------------- tiles
+% (tile cs:x=3,y=5) is the center of the tile in column 3, row 5, counted from 0 at the
+% top left as in Factorio-SAT; \bmtile{3}{5} is the same point.
+\pgfkeys{/beltmap/tile cs/.cd, x/.store in=\bm@tx, y/.store in=\bm@ty}
+\tikzdeclarecoordinatesystem{tile}{%
+	\pgfqkeys{/beltmap/tile cs}{x=0,y=0,#1}%
+	\pgfpointxy{\bm@tx+0.5}{-\bm@ty-0.5}%
+}
+\def\bmtile#1#2{(tile cs:x={#1},y={#2})}
+
+\tikzset{
+	bm tile/.code={\pgfmathsetlength\bmunit{#1}\tikzset{x=\bmunit,y=\bmunit}},
+	bm theme/.code={\pgfkeysifdefined{/tikz/bm theme #1/.@cmd}{\tikzset{bm theme #1}}{\PackageError{beltmap}{Unknown theme `#1'}{The themes are schematic, dark, transit, print and industrial.}}},
+	bm background/.style={},
+	% Belts and tunnels take the color of their belt as argument.
+	bm lanes/.style={},
+	% mix=bands: a stroke along a belt in an input's color, #2 times the band width wide.
+	bm band width/.initial=0.46,
+	bm band shape/.style={rounded corners=0.12\bmunit},
+	bm band/.style 2 args={bm band shape, draw=#1, line width={#2*\pgfkeysvalueof{/tikz/bm band width}*\bmunit}},
+	% mix: a belt that carries nothing, because nothing reaches it or it leads nowhere.
+	bm idle/.code={\colorlet{bm-idle}{#1}},
+	% Grids to count tiles by: faint, strong (over the entry and exit lines too), major lines
+	% every n tiles, rulers and dimensions; all in the ink a theme sets with bm gridink.
+	bm grid faint/.style={draw opacity=0.4},
+	bm grid strong/.style={draw=bm-gridink, line width=0.45pt, draw opacity=0.75},
+	bm grid major/.style={draw=bm-gridink, line width=1pt},
+	bm ruler/.style={font=\sffamily\tiny, text=bm-gridink, inner sep=1pt},
+	bm dim/.style={draw=bm-gridink, line width=0.4pt, {Bar[width=0pt 12]Stealth[length=0pt 6, width=0pt 5]}-{Stealth[length=0pt 6, width=0pt 5]Bar[width=0pt 12]}},
+	bm dim label/.style={font=\sffamily\scriptsize, text=bm-gridink, inner sep=2pt},
+	bm gridink/.code={\colorlet{bm-gridink}{#1}},
+	% throughput: the lanes of a cut glow under their belts.
+	bm cut/.style={draw=bm-cut, line width=0.62\bmunit, rounded corners=0.12\bmunit, line cap=round, opacity=0.55},
+	% compare=: tiles added and changed (under the belts) and removed (a dashed outline).
+	bm diff added/.style={fill=bm-added, fill opacity=0.35},
+	bm diff changed/.style={fill=bm-changed, fill opacity=0.35},
+	bm diff removed/.style={draw=bm-removed, line width=0.06\bmunit, dash pattern=on 0.12\bmunit off 0.08\bmunit},
+	bm splitter number/.style={font=\sffamily\bfseries\tiny, text=white, inner sep=0pt},
+	% view=graph: nodes and arcs of the splitter graph, from the colors a theme sets.
+	% Sizes follow the tile, so the graph scales with tile= like the layout.
+	bm g input/.style={circle, draw=bm-gink, fill=bm-gbg, line width=0.07\bmunit, inner sep=0pt, minimum size=1.05\bmunit, text=bm-gink, font=\sffamily\scriptsize},
+	bm g output/.style={bm g input},
+	bm g splitter/.style={rectangle, rounded corners=0.22\bmunit, fill=bm-gfill, text=bm-gtext, inner sep=0pt, minimum width=1.0\bmunit, minimum height=1.9\bmunit, font=\sffamily\bfseries\scriptsize},
+	bm g merge/.style={circle, fill=bm-gink, inner sep=0pt, minimum size=0.4\bmunit},
+	% Arcs: the belt's color over a halo of the ground, so crossings stay readable.
+	bm g arc/.style={draw=#1, line width=0.17\bmunit, -{Stealth[length=0pt 3.6, width=0pt 3.2]}, shorten >=0.05\bmunit,
+		preaction={draw=bm-gbg, line width=0.42\bmunit, -}},
+	bm gcolors/.code n args={4}{\colorlet{bm-gfill}{#1}\colorlet{bm-gtext}{#2}\colorlet{bm-gink}{#3}\colorlet{bm-gbg}{#4}},
+}
+\definecolor{bm-idle}{RGB}{206,204,198}
+\colorlet{bm-gridink}{black!55}
+\definecolor{bm-cut}{RGB}{230,40,40}
+\definecolor{bm-added}{RGB}{60,190,90}
+\definecolor{bm-changed}{RGB}{245,170,30}
+\definecolor{bm-removed}{RGB}{220,50,50}
+\colorlet{bm-gfill}{black!80}\colorlet{bm-gtext}{white}\colorlet{bm-gink}{black!75}\colorlet{bm-gbg}{white}
+
+% ---------------------------------------------------------------------- theme: schematic
+% Thick colored belts, dark blocks, white marks, chevron tunnels.
+\definecolor{bm-block}{RGB}{52,58,70}
+\definecolor{bm-end}{RGB}{236,232,222}
+\definecolor{bm-grid}{RGB}{226,222,212}
+\definecolor{bm-bg}{RGB}{250,248,243}
+\definecolor{bm-prio}{RGB}{255,190,40}
+\tikzset{
+	bm chevrons/.style 2 args={
+		decoration={markings, mark=between positions 0.04 and 0.98 step 0.2\bmunit with {
+			\draw[#1, line width=0.055\bmunit, line cap=round, line join=round] (-0.05\bmunit,0.085\bmunit) -- (0.05\bmunit,0) -- (-0.05\bmunit,-0.085\bmunit);}},
+		decorate,
+	},
+	bm theme schematic/.style={
+		bm grid/.style={draw=bm-grid, line width=0.3pt},
+		bm end/.style={fill=bm-end},
+		bm frame/.style={draw=bm-grid, line width=0.3pt},
+		bm belt/.style={draw=##1, line width=0.29\bmunit, rounded corners=0.12\bmunit},
+		bm lanes/.style={postaction={draw=##1!55!black, line width=0.025\bmunit, dash pattern=on 0.06\bmunit off 0.05\bmunit}},
+		bm tunnel/.style={bm chevrons={##1}{}},
+		bm head/.style={fill=white},
+		bm hood entrance/.style={fill=bm-block, rounded corners=0.08\bmunit},
+		bm hood exit/.style={fill=bm-bg, draw=bm-block, line width=0.065\bmunit, rounded corners=0.08\bmunit},
+		bm hood mark/.style={draw=white, line width=0.055\bmunit, line cap=round, line join=round},
+		bm hood mark exit/.style={draw=bm-block, line width=0.055\bmunit, line cap=round, line join=round},
+		bm trim bar/.style={draw=##1, line width=0.075\bmunit, line cap=round},
+		bm splitter body/.style={fill=bm-block, rounded corners=0.16\bmunit},
+		bm trim/.style={draw=##1, line width=0.08\bmunit},
+		bm splitter arrow/.style={fill=white},
+		bm prio/.style={fill=bm-prio},
+		bm filter/.style={fill=##1, draw=white, line width=0.035\bmunit},
+		bm label/.style={font=\sffamily\footnotesize, inner sep=2pt},
+		bm band width=0.46,
+		bm band shape/.style={rounded corners=0.12\bmunit},
+		bm idle={bm-grid!70!black!30},
+		bm gcolors={bm-block}{white}{bm-block}{bm-bg},
+		bm gridink={bm-block!70},
+	},
+}
+
+% ---------------------------------------------------------------------- theme: dark
+% The schematic look on a dark ground: light blocks with dark marks, orange priorities.
+\definecolor{bm-dark-bg}{RGB}{24,26,32}
+\definecolor{bm-dark-grid}{RGB}{46,49,58}
+\definecolor{bm-dark-end}{RGB}{37,40,49}
+\definecolor{bm-dark-block}{RGB}{208,213,224}
+\definecolor{bm-dark-ink}{RGB}{232,232,238}
+\definecolor{bm-dark-prio}{RGB}{226,92,0}
+\tikzset{
+	bm theme dark/.style={
+		bm theme schematic,
+		show background rectangle,
+		inner frame sep=0.6\bmunit,
+		background rectangle/.style={fill=bm-dark-bg, rounded corners=0.3\bmunit},
+		bm grid/.style={draw=bm-dark-grid, line width=0.3pt},
+		bm end/.style={fill=bm-dark-end},
+		bm frame/.style={draw=bm-dark-grid, line width=0.3pt},
+		bm head/.style={fill=bm-dark-bg},
+		bm hood entrance/.style={fill=bm-dark-block, rounded corners=0.08\bmunit},
+		bm hood exit/.style={fill=bm-dark-bg, draw=bm-dark-block, line width=0.065\bmunit, rounded corners=0.08\bmunit},
+		bm hood mark/.style={draw=bm-dark-bg, line width=0.055\bmunit, line cap=round, line join=round},
+		bm hood mark exit/.style={draw=bm-dark-block, line width=0.055\bmunit, line cap=round, line join=round},
+		bm splitter body/.style={fill=bm-dark-block, rounded corners=0.16\bmunit},
+		bm splitter arrow/.style={fill=bm-dark-bg},
+		bm prio/.style={fill=bm-dark-prio},
+		bm filter/.style={fill=##1, draw=bm-dark-bg, line width=0.035\bmunit},
+		bm label/.style={font=\sffamily\footnotesize, inner sep=2pt, text=bm-dark-ink},
+		bm idle={bm-dark-grid!60!bm-dark-block},
+		bm splitter number/.style={font=\sffamily\bfseries\tiny, text=bm-dark-bg, inner sep=0pt},
+		bm gcolors={bm-dark-block}{bm-dark-bg}{bm-dark-ink}{bm-dark-bg},
+		bm gridink={bm-dark-block!70!bm-dark-bg},
+	},
+}
+
+% ---------------------------------------------------------------------- theme: transit
+% A transit map: thin lines with round turns, splitters as stations, tunnels as dashes,
+% no grid and no arrowheads (direction shows on splitters and portals).
+\definecolor{bm-ink}{RGB}{34,36,44}
+\definecolor{bm-accent}{RGB}{226,92,0}
+\tikzset{
+	bm theme transit/.style={
+		bm grid/.style={draw=none},
+		bm end/.style={fill=black!4},
+		bm frame/.style={draw=none},
+		bm belt/.style={draw=##1, line width=0.13\bmunit, rounded corners=0.3\bmunit, line cap=round},
+		bm lanes/.style={postaction={draw=white, line width=0.025\bmunit}},
+		bm tunnel/.style={draw=##1, line width=0.07\bmunit, dash pattern=on 0.1\bmunit off 0.09\bmunit},
+		bm head/.style={draw=none},
+		bm hood entrance/.style={fill=bm-ink, scale=0.62, rounded corners=0.1\bmunit},
+		bm hood exit/.style={fill=white, draw=bm-ink, line width=0.05\bmunit, scale=0.62, rounded corners=0.1\bmunit},
+		bm hood mark/.style={draw=none},
+		bm hood mark exit/.style={draw=none},
+		bm trim bar/.style={draw=##1, line width=0.06\bmunit, line cap=round, scale=0.62},
+		bm splitter body/.style={fill=white, draw=bm-ink, line width=0.07\bmunit, rounded corners=0.25\bmunit, xscale=0.75},
+		bm trim/.style={draw=##1},
+		bm splitter arrow/.style={fill=bm-ink, scale=0.8},
+		bm prio/.style={fill=bm-accent, scale=0.8},
+		bm filter/.style={draw=##1, fill=white, line width=0.07\bmunit, scale=0.85},
+		bm label/.style={font=\sffamily\footnotesize, inner sep=2pt},
+		bm band width=0.26,
+		bm band shape/.style={rounded corners=0.3\bmunit},
+		bm idle={black!18},
+		bm splitter number/.style={font=\sffamily\bfseries\tiny, text=bm-ink, inner sep=0pt},
+		bm gcolors={white}{bm-ink}{bm-ink}{white},
+		bm gridink={bm-ink!60},
+	},
+}
+
+% ---------------------------------------------------------------------- theme: print
+% Black ink only: each belt drawn as its two lanes, tunnels as hidden lines, gray blocks.
+% Belt colors and tier trim are ignored.
+\tikzset{
+	bm theme print/.style={
+		bm grid/.style={draw=black!8, line width=0.2pt},
+		bm end/.style={fill=black!9},
+		bm frame/.style={draw=black!30, line width=0.3pt},
+		bm belt/.style={draw=black, line width=0.045\bmunit, double=white, double distance=0.2\bmunit, rounded corners=0.12\bmunit,
+			postaction={draw=black!50, line width=0.02\bmunit, dash pattern=on 0.05\bmunit off 0.05\bmunit}},
+		bm lanes/.style={},
+		bm tunnel/.style={draw=black, line width=0.04\bmunit, dash pattern=on 0.14\bmunit off 0.08\bmunit},
+		bm head/.style={fill=black, scale=0.75},
+		bm hood entrance/.style={fill=black, rounded corners=0.06\bmunit},
+		bm hood exit/.style={fill=white, draw=black, line width=0.05\bmunit, rounded corners=0.06\bmunit},
+		bm hood mark/.style={draw=white, line width=0.05\bmunit},
+		bm hood mark exit/.style={draw=black, line width=0.05\bmunit},
+		bm trim bar/.style={},
+		bm splitter body/.style={fill=black!12, draw=black, line width=0.06\bmunit, rounded corners=0.08\bmunit},
+		bm trim/.style={},
+		bm splitter arrow/.style={fill=black},
+		bm prio/.style={fill=black},
+		bm filter/.style={fill=white, draw=black, line width=0.05\bmunit},
+		bm label/.style={font=\footnotesize\itshape, inner sep=2pt},
+		bm band width=0.2,
+		bm band shape/.style={rounded corners=0.12\bmunit},
+		bm idle={white},
+		bm splitter number/.style={font=\sffamily\bfseries\tiny, text=black, inner sep=0pt},
+		bm gcolors={black!12}{black}{black}{white},
+		bm gridink={black!60},
+	},
+}
+
+% ---------------------------------------------------------------------- theme: industrial
+% After the feel of the game, drawn from scratch (no game graphics): a concrete floor,
+% belts as dark tracks with slats between two rails in the belt's color, steel housings
+% for splitters and underground belts, the tier's color as a stripe (yellow when the
+% layout names no tier), and hazard stripes on the entry and exit lines.
+\definecolor{bm-ind-floor}{RGB}{58,57,53}
+\definecolor{bm-ind-seam}{RGB}{70,69,64}
+\definecolor{bm-ind-track}{RGB}{36,36,38}
+\definecolor{bm-ind-steel}{RGB}{150,153,158}
+\definecolor{bm-ind-steel-dark}{RGB}{96,99,105}
+\definecolor{bm-ind-edge}{RGB}{24,24,26}
+\definecolor{bm-ind-hazard}{RGB}{176,140,40}
+\definecolor{bm-ind-lamp}{RGB}{255,176,32}
+\definecolor{bm-ind-ink}{RGB}{226,224,216}
+\tikzset{
+	% Slats across the track, as a dash pattern: decoration markings along these belts stop
+	% TeX with "Dimension too large" on some corners.
+	bm treads/.style={postaction={draw=#1, line width=0.46\bmunit, dash pattern=on 0.07\bmunit off 0.18\bmunit}},
+	bm theme industrial/.style={
+		show background rectangle,
+		inner frame sep=0.6\bmunit,
+		background rectangle/.style={fill=bm-ind-floor, rounded corners=0.15\bmunit},
+		bm grid/.style={draw=bm-ind-seam, line width=0.5pt},
+		% Stripes drawn by hand: a pattern would not scale with the tile.
+		bm end/.style={fill=bm-ind-edge, path picture={
+			\foreach \bm@i in {-70,...,70} {\draw[bm-ind-hazard, line width=0.22\bmunit] ([shift={(\bm@i*0.5,0)}]path picture bounding box.south west) -- ++(40,40);}
+		}},
+		bm frame/.style={draw=bm-ind-seam, line width=0.5pt},
+		bm belt/.style={draw=##1, double=bm-ind-track, line width=0.07\bmunit, double distance=0.48\bmunit, rounded corners=0.2\bmunit,
+			preaction={draw=bm-ind-edge, line width=0.68\bmunit}, bm treads=##1!38!bm-ind-track},
+		bm lanes/.style={postaction={draw=bm-ind-edge, line width=0.03\bmunit}},
+		bm tunnel/.style={draw=##1, line width=0.08\bmunit, dash pattern=on 0.12\bmunit off 0.12\bmunit, opacity=0.6},
+		bm head/.style={fill=bm-ind-ink, draw=bm-ind-edge, line width=0.02\bmunit, scale=1.25},
+		bm hood entrance/.style={fill=bm-ind-steel, draw=bm-ind-edge, line width=0.05\bmunit, rounded corners=0.05\bmunit},
+		bm hood exit/.style={fill=bm-ind-edge, draw=bm-ind-steel, line width=0.09\bmunit, rounded corners=0.05\bmunit},
+		bm hood mark/.style={draw=bm-ind-edge, line width=0.07\bmunit, line cap=round, line join=round},
+		bm hood mark exit/.style={draw=bm-ind-steel, line width=0.07\bmunit, line cap=round, line join=round},
+		bm trim bar/.style={draw=##1, line width=0.11\bmunit, line cap=butt},
+		bm splitter body/.style={fill=bm-ind-steel, draw=bm-ind-edge, double=bm-ind-steel-dark, line width=0.05\bmunit, double distance=0.06\bmunit, rounded corners=0.07\bmunit},
+		bm trim/.style={draw=##1, line width=0.07\bmunit},
+		bm splitter arrow/.style={fill=bm-ind-edge},
+		bm prio/.style={fill=bm-ind-lamp, draw=bm-ind-edge, line width=0.03\bmunit},
+		bm filter/.style={fill=##1, draw=bm-ind-edge, line width=0.04\bmunit},
+		bm label/.style={font=\sffamily\bfseries\footnotesize, inner sep=2pt, text=bm-ind-ink},
+		bm band width=0.46,
+		bm band shape/.style={rounded corners=0.2\bmunit},
+		bm idle={bm-ind-steel-dark},
+		bm splitter number/.style={font=\sffamily\bfseries\tiny, text=bm-ind-edge, inner sep=0pt},
+		bm gcolors={bm-ind-steel}{bm-ind-edge}{bm-ind-ink}{bm-ind-floor},
+		bm gridink={bm-ind-ink!70!bm-ind-floor},
+	},
+}
+
+\tikzset{bm theme schematic}

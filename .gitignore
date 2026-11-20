@@ -1,0 +1,10 @@
+build/
+.leak-patterns
+*.aux
+*.log
+*.out
+*.toc
+*.pdf
+*-blueprint-*.txt
+*-book.txt
+__pycache__/
