@@ -1,0 +1,515 @@
+inputs 5, outputs 5, splitters 11, tunnels 4, exact true
+output 1: 1/5 1/5 1/5 1/5 1/5
+output 2: 1/5 1/5 1/5 1/5 1/5
+output 3: 1/5 1/5 1/5 1/5 1/5
+output 4: 1/5 1/5 1/5 1/5 1/5
+output 5: 1/5 1/5 1/5 1/5 1/5
+balance: balanced: each of the 5 outputs carries 20\% of each of the 5 inputs
+lanes: lanes kept: each output lane carries 20\% of each input lane on its side, and nothing of the other side
+throughput: passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (961 choices; necessary for throughput-unlimited, not sufficient)
+blocked: not balanced with output 1 blocked: output 2 carries 40\% of input 1, not 25\% (18 of 30 choices fail, at light load)
+inputs: input balanced: each of the 5 inputs supplies 20\% of every output's demand (at full backpressure)
+wires: 21 02|101124135203214256316345412501523|46|01235
+alt: Belt layout of 11 by 8 tiles with 11 splitters and 4 underground tunnels; 5 inputs enter on the left and 5 outputs leave on the right. Belts are colored by the inputs they carry; the layout is balanced: each of the 5 outputs carries 20 percent of each of the 5 inputs. Throughput: passes the max-flow test: no choice of inputs and outputs is held below min(|I|, |O|) belts by a cut (961 choices; necessary for throughput-unlimited, not sufficient). With outputs blocked: not balanced with output 1 blocked: output 2 carries 40 percent of input 1, not 25 percent (18 of 30 choices fail, at light load). Input balance: input balanced: each of the 5 inputs supplies 20 percent of every output's demand (at full backpressure).
+caption: 5--5 \textperiodcentered\ 9$\times$8 \textperiodcentered\ 11 splitters \textperiodcentered\ 4 tunnels \textperiodcentered\ balanced \textperiodcentered\ passes max-flow \textperiodcentered\ unbalanced when blocked \textperiodcentered\ input balanced
+
+== tikz: layout, mix
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmc10}{RGB}{124,178,71}
+\definecolor{bmc11}{RGB}{198,19,161}
+\definecolor{bmc12}{RGB}{48,219,205}
+\definecolor{bmc13}{RGB}{178,138,71}
+\definecolor{bmc14}{RGB}{79,19,198}
+\definecolor{bmc15}{RGB}{48,219,55}
+\definecolor{bmc16}{RGB}{178,71,98}
+\definecolor{bmc17}{RGB}{19,116,198}
+\definecolor{bmc18}{RGB}{190,219,48}
+\definecolor{bmc19}{RGB}{165,71,178}
+\definecolor{bmc20}{RGB}{19,198,124}
+\definecolor{bmc21}{RGB}{219,98,48}
+\definecolor{bmc22}{RGB}{71,71,178}
+\definecolor{bmc23}{RGB}{72,198,19}
+\definecolor{bmc24}{RGB}{219,48,147}
+\definecolor{bmc25}{RGB}{71,165,178}
+\definecolor{bmc26}{RGB}{198,169,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{156,139,7}
+\definecolor{bmi2}{RGB}{55,199,164}
+\definecolor{bmi3}{RGB}{77,164,231}
+\definecolor{bmi4}{RGB}{179,121,200}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{156,139,7}
+\definecolor{bmp2}{RGB}{55,199,164}
+\definecolor{bmp3}{RGB}{77,164,231}
+\definecolor{bmp4}{RGB}{179,121,200}
+\definecolor{bmp5}{RGB}{203,144,84}
+\definecolor{bmp6}{RGB}{203,144,84}
+\definecolor{bmp7}{RGB}{65,183,199}
+\definecolor{bmp8}{RGB}{65,183,199}
+\definecolor{bmp9}{RGB}{152,166,146}
+\definecolor{bmp10}{RGB}{152,166,146}
+\definecolor{bmp11}{RGB}{169,141,180}
+\definecolor{bmp12}{RGB}{169,141,180}
+\definecolor{bmp13}{RGB}{182,152,124}
+\definecolor{bmp14}{RGB}{132,163,190}
+\definecolor{bmp15}{RGB}{132,163,190}
+\definecolor{bmp16}{RGB}{158,158,158}
+\definecolor{bmp17}{RGB}{182,152,124}
+\definecolor{bmp18}{RGB}{158,158,158}
+\definecolor{bmp19}{RGB}{158,158,158}
+\definecolor{bmp20}{RGB}{158,158,158}
+\definecolor{bmp21}{RGB}{164,150,169}
+\definecolor{bmp22}{RGB}{164,150,169}
+\definecolor{bmp23}{RGB}{158,158,158}
+\definecolor{bmp24}{RGB}{158,158,158}
+\definecolor{bmp25}{RGB}{158,158,158}
+\definecolor{bmp26}{RGB}{158,158,158}
+\path[bm grid] (0,0) grid[step=1] (11,-8);
+\path[bm end] (0,0) rectangle (1,-8);
+\path[bm end] (10,0) rectangle (11,-8);
+\path[bm frame] (0,0) rectangle (11,-8);
+\path[bm tunnel=bmp9] (3.92,-1.5) -- (8.08,-1.5);
+\path[bm tunnel=bmp10] (3.92,-2.5) -- (8.08,-2.5);
+\path[bm tunnel=bmp12] (3.92,-6.5) -- (7.08,-6.5);
+\path[bm tunnel=bmp17] (5.5,-2.92) -- (5.5,-5.08);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (0,-2.5) -- (1.21,-2.5);
+\path[bm belt=bmp3] (0,-3.5) -- (1.21,-3.5);
+\path[bm belt=bmp4] (0,-4.5) -- (1.5,-4.5) -- (1.5,-5.5) -- (2.21,-5.5);
+\path[bm belt=bmp5] (1.79,-0.5) -- (4.5,-0.5) -- (4.5,-1.21);
+\path[bm belt=bmp6] (1.79,-1.5) -- (2.21,-1.5);
+\path[bm belt=bmp7] (1.79,-2.5) -- (2.21,-2.5);
+\path[bm belt=bmp8] (1.79,-3.5) -- (2.5,-3.5) -- (2.5,-4.5) -- (3.21,-4.5);
+\path[bm belt=bmp9] (2.79,-1.5) -- (3.49,-1.5);
+\path[bm belt=bmp9] (8.51,-1.5) -- (9.21,-1.5);
+\path[bm belt=bmp10] (2.79,-2.5) -- (3.49,-2.5);
+\path[bm belt=bmp10] (8.51,-2.5) -- (9.21,-2.5);
+\path[bm belt=bmp11] (2.79,-5.5) -- (3.21,-5.5);
+\path[bm belt=bmp12] (2.79,-6.5) -- (3.49,-6.5);
+\path[bm belt=bmp12] (7.51,-6.5) -- (8.5,-6.5) -- (8.5,-4.79);
+\path[bm belt=bmp13] (4.5,-1.79) -- (4.5,-3.5) -- (5.21,-3.5);
+\path[bm belt=bmp14] (3.79,-4.5) -- (5.21,-4.5);
+\path[bm belt=bmp15] (3.79,-5.5) -- (4.5,-5.5) -- (4.5,-6.21);
+\path[bm belt=bmp16] (4.5,-6.79) -- (4.5,-7.5) -- (1.5,-7.5) -- (1.5,-6.5) -- (2.21,-6.5);
+\path[bm belt=bmp17] (5.5,-1.79) -- (5.5,-2.49);
+\path[bm belt=bmp17] (5.5,-5.51) -- (5.5,-6.21);
+\path[bm belt=bmp18] (5.5,-6.79) -- (5.5,-7.5) -- (9.5,-7.5) -- (9.5,-4.5) -- (11,-4.5);
+\path[bm belt=bmp19] (5.79,-3.5) -- (6.5,-3.5) -- (6.5,-0.5) -- (5.5,-0.5) -- (5.5,-1.21);
+\path[bm belt=bmp20] (5.79,-4.5) -- (6.5,-4.5) -- (6.5,-5.5) -- (7.5,-5.5) -- (7.5,-4.79);
+\path[bm belt=bmp21] (7.5,-4.21) -- (7.5,-0.5) -- (9.21,-0.5);
+\path[bm belt=bmp22] (8.5,-4.21) -- (8.5,-3.5) -- (9.21,-3.5);
+\path[bm belt=bmp23] (9.79,-0.5) -- (11,-0.5);
+\path[bm belt=bmp24] (9.79,-1.5) -- (11,-1.5);
+\path[bm belt=bmp25] (9.79,-2.5) -- (11,-2.5);
+\path[bm belt=bmp26] (9.79,-3.5) -- (11,-3.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (0.75,-2.5) {bm head=right};
+\pic at (0.75,-3.5) {bm head=right};
+\pic at (0.75,-4.5) {bm head=right};
+\pic at (1.5,-4.75) {bm head=down};
+\pic at (1.75,-5.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.5,-0.75) {bm head=down};
+\pic at (2.5,-3.75) {bm head=down};
+\pic at (2.75,-4.5) {bm head=right};
+\pic at (8.5,-6.25) {bm head=up};
+\pic at (8.5,-5.25) {bm head=up};
+\pic at (4.5,-2.75) {bm head=down};
+\pic at (4.75,-3.5) {bm head=right};
+\pic at (4.75,-4.5) {bm head=right};
+\pic at (4.5,-5.75) {bm head=down};
+\pic at (4.25,-7.5) {bm head=left};
+\pic at (3.25,-7.5) {bm head=left};
+\pic at (2.25,-7.5) {bm head=left};
+\pic at (1.5,-7.25) {bm head=up};
+\pic at (1.75,-6.5) {bm head=right};
+\pic at (5.75,-7.5) {bm head=right};
+\pic at (6.75,-7.5) {bm head=right};
+\pic at (7.75,-7.5) {bm head=right};
+\pic at (8.75,-7.5) {bm head=right};
+\pic at (9.5,-7.25) {bm head=up};
+\pic at (9.5,-6.25) {bm head=up};
+\pic at (9.5,-5.25) {bm head=up};
+\pic at (9.75,-4.5) {bm head=right};
+\pic at (10.75,-4.5) {bm head=right};
+\pic at (6.5,-3.25) {bm head=up};
+\pic at (6.5,-2.25) {bm head=up};
+\pic at (6.5,-1.25) {bm head=up};
+\pic at (6.25,-0.5) {bm head=left};
+\pic at (5.5,-0.75) {bm head=down};
+\pic at (6.5,-4.75) {bm head=down};
+\pic at (6.75,-5.5) {bm head=right};
+\pic at (7.5,-5.25) {bm head=up};
+\pic at (7.5,-3.25) {bm head=up};
+\pic at (7.5,-2.25) {bm head=up};
+\pic at (7.5,-1.25) {bm head=up};
+\pic at (7.75,-0.5) {bm head=right};
+\pic at (8.75,-0.5) {bm head=right};
+\pic at (8.75,-3.5) {bm head=right};
+\pic at (10.75,-0.5) {bm head=right};
+\pic at (10.75,-1.5) {bm head=right};
+\pic at (10.75,-2.5) {bm head=right};
+\pic at (10.75,-3.5) {bm head=right};
+\pic at (3.5,-1.5) {bm entrance={right}};
+\pic at (3.5,-2.5) {bm entrance={right}};
+\pic at (3.5,-6.5) {bm entrance={right}};
+\pic at (5.5,-2.5) {bm entrance={down}};
+\pic at (5.5,-5.5) {bm exit={down}};
+\pic at (7.5,-6.5) {bm exit={right}};
+\pic at (8.5,-1.5) {bm exit={right}};
+\pic at (8.5,-2.5) {bm exit={right}};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (1.5,-3) {bm splitter={right}};
+\pic at (2.5,-2) {bm splitter={right}};
+\pic at (2.5,-6) {bm splitter={right}};
+\pic at (3.5,-5) {bm splitter={right}};
+\pic at (5,-1.5) {bm splitter={down}};
+\pic at (5,-6.5) {bm splitter={down}};
+\pic at (5.5,-4) {bm splitter={right}};
+\pic at (8,-4.5) {bm splitter={up}};
+\pic at (9.5,-1) {bm splitter={right}};
+\pic at (9.5,-3) {bm splitter={right}};
+\node[bm label, anchor=east] at (0,-0.5) {1};
+\node[bm label, anchor=east] at (0,-1.5) {2};
+\node[bm label, anchor=east] at (0,-2.5) {3};
+\node[bm label, anchor=east] at (0,-3.5) {4};
+\node[bm label, anchor=east] at (0,-4.5) {5};
+\node[bm label, anchor=west] at (11,-0.5) {1};
+\node[bm label, anchor=west] at (11,-1.5) {2};
+\node[bm label, anchor=west] at (11,-2.5) {3};
+\node[bm label, anchor=west] at (11,-3.5) {4};
+\node[bm label, anchor=west] at (11,-4.5) {5};
+
+== tikz: layout, strict, marks, throughput
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmc10}{RGB}{124,178,71}
+\definecolor{bmc11}{RGB}{198,19,161}
+\definecolor{bmc12}{RGB}{48,219,205}
+\definecolor{bmc13}{RGB}{178,138,71}
+\definecolor{bmc14}{RGB}{79,19,198}
+\definecolor{bmc15}{RGB}{48,219,55}
+\definecolor{bmc16}{RGB}{178,71,98}
+\definecolor{bmc17}{RGB}{19,116,198}
+\definecolor{bmc18}{RGB}{190,219,48}
+\definecolor{bmc19}{RGB}{165,71,178}
+\definecolor{bmc20}{RGB}{19,198,124}
+\definecolor{bmc21}{RGB}{219,98,48}
+\definecolor{bmc22}{RGB}{71,71,178}
+\definecolor{bmc23}{RGB}{72,198,19}
+\definecolor{bmc24}{RGB}{219,48,147}
+\definecolor{bmc25}{RGB}{71,165,178}
+\definecolor{bmc26}{RGB}{198,169,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{156,139,7}
+\definecolor{bmi2}{RGB}{55,199,164}
+\definecolor{bmi3}{RGB}{77,164,231}
+\definecolor{bmi4}{RGB}{179,121,200}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{156,139,7}
+\definecolor{bmp2}{RGB}{55,199,164}
+\definecolor{bmp3}{RGB}{77,164,231}
+\definecolor{bmp4}{RGB}{179,121,200}
+\definecolor{bmp5}{RGB}{203,144,84}
+\definecolor{bmp6}{RGB}{203,144,84}
+\definecolor{bmp7}{RGB}{65,183,199}
+\definecolor{bmp8}{RGB}{65,183,199}
+\definecolor{bmp9}{RGB}{150,169,142}
+\definecolor{bmp10}{RGB}{150,169,142}
+\definecolor{bmp11}{RGB}{169,141,180}
+\definecolor{bmp12}{RGB}{169,141,180}
+\definecolor{bmp13}{RGB}{182,152,124}
+\definecolor{bmp14}{RGB}{132,163,190}
+\definecolor{bmp15}{RGB}{132,163,190}
+\definecolor{bmp16}{RGB}{158,158,158}
+\definecolor{bmp17}{RGB}{182,152,124}
+\definecolor{bmp18}{RGB}{158,158,158}
+\definecolor{bmp19}{RGB}{158,158,158}
+\definecolor{bmp20}{RGB}{158,158,158}
+\definecolor{bmp21}{RGB}{166,147,173}
+\definecolor{bmp22}{RGB}{166,147,173}
+\definecolor{bmp23}{RGB}{158,158,158}
+\definecolor{bmp24}{RGB}{158,158,158}
+\definecolor{bmp25}{RGB}{158,158,158}
+\definecolor{bmp26}{RGB}{158,158,158}
+\path[bm grid] (0,0) grid[step=1] (11,-8);
+\path[bm end] (0,0) rectangle (1,-8);
+\path[bm end] (10,0) rectangle (11,-8);
+\path[bm frame] (0,0) rectangle (11,-8);
+\path[bm tunnel=bmp9] (3.92,-1.5) -- (8.08,-1.5);
+\path[bm tunnel=bmp10] (3.92,-2.5) -- (8.08,-2.5);
+\path[bm tunnel=bmp12] (3.92,-6.5) -- (7.08,-6.5);
+\path[bm tunnel=bmp17] (5.5,-2.92) -- (5.5,-5.08);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (0,-2.5) -- (1.21,-2.5);
+\path[bm belt=bmp3] (0,-3.5) -- (1.21,-3.5);
+\path[bm belt=bmp4] (0,-4.5) -- (1.5,-4.5) -- (1.5,-5.5) -- (2.21,-5.5);
+\path[bm belt=bmp5] (1.79,-0.5) -- (4.5,-0.5) -- (4.5,-1.21);
+\path[bm belt=bmp6] (1.79,-1.5) -- (2.21,-1.5);
+\path[bm belt=bmp7] (1.79,-2.5) -- (2.21,-2.5);
+\path[bm belt=bmp8] (1.79,-3.5) -- (2.5,-3.5) -- (2.5,-4.5) -- (3.21,-4.5);
+\path[bm belt=bmp9] (2.79,-1.5) -- (3.49,-1.5);
+\path[bm belt=bmp9] (8.51,-1.5) -- (9.21,-1.5);
+\path[bm belt=bmp10] (2.79,-2.5) -- (3.49,-2.5);
+\path[bm belt=bmp10] (8.51,-2.5) -- (9.21,-2.5);
+\path[bm belt=bmp11] (2.79,-5.5) -- (3.21,-5.5);
+\path[bm belt=bmp12] (2.79,-6.5) -- (3.49,-6.5);
+\path[bm belt=bmp12] (7.51,-6.5) -- (8.5,-6.5) -- (8.5,-4.79);
+\path[bm belt=bmp13] (4.5,-1.79) -- (4.5,-3.5) -- (5.21,-3.5);
+\path[bm belt=bmp14] (3.79,-4.5) -- (5.21,-4.5);
+\path[bm belt=bmp15] (3.79,-5.5) -- (4.5,-5.5) -- (4.5,-6.21);
+\path[bm belt=bmp16] (4.5,-6.79) -- (4.5,-7.5) -- (1.5,-7.5) -- (1.5,-6.5) -- (2.21,-6.5);
+\path[bm belt=bmp17] (5.5,-1.79) -- (5.5,-2.49);
+\path[bm belt=bmp17] (5.5,-5.51) -- (5.5,-6.21);
+\path[bm belt=bmp18] (5.5,-6.79) -- (5.5,-7.5) -- (9.5,-7.5) -- (9.5,-4.5) -- (11,-4.5);
+\path[bm belt=bmp19] (5.79,-3.5) -- (6.5,-3.5) -- (6.5,-0.5) -- (5.5,-0.5) -- (5.5,-1.21);
+\path[bm belt=bmp20] (5.79,-4.5) -- (6.5,-4.5) -- (6.5,-5.5) -- (7.5,-5.5) -- (7.5,-4.79);
+\path[bm belt=bmp21] (7.5,-4.21) -- (7.5,-0.5) -- (9.21,-0.5);
+\path[bm belt=bmp22] (8.5,-4.21) -- (8.5,-3.5) -- (9.21,-3.5);
+\path[bm belt=bmp23] (9.79,-0.5) -- (11,-0.5);
+\path[bm belt=bmp24] (9.79,-1.5) -- (11,-1.5);
+\path[bm belt=bmp25] (9.79,-2.5) -- (11,-2.5);
+\path[bm belt=bmp26] (9.79,-3.5) -- (11,-3.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (0.75,-2.5) {bm head=right};
+\pic at (0.75,-3.5) {bm head=right};
+\pic at (0.75,-4.5) {bm head=right};
+\pic at (1.5,-4.75) {bm head=down};
+\pic at (1.75,-5.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.5,-0.75) {bm head=down};
+\pic at (2.5,-3.75) {bm head=down};
+\pic at (2.75,-4.5) {bm head=right};
+\pic at (8.5,-6.25) {bm head=up};
+\pic at (8.5,-5.25) {bm head=up};
+\pic at (4.5,-2.75) {bm head=down};
+\pic at (4.75,-3.5) {bm head=right};
+\pic at (4.75,-4.5) {bm head=right};
+\pic at (4.5,-5.75) {bm head=down};
+\pic at (4.25,-7.5) {bm head=left};
+\pic at (3.25,-7.5) {bm head=left};
+\pic at (2.25,-7.5) {bm head=left};
+\pic at (1.5,-7.25) {bm head=up};
+\pic at (1.75,-6.5) {bm head=right};
+\pic at (5.75,-7.5) {bm head=right};
+\pic at (6.75,-7.5) {bm head=right};
+\pic at (7.75,-7.5) {bm head=right};
+\pic at (8.75,-7.5) {bm head=right};
+\pic at (9.5,-7.25) {bm head=up};
+\pic at (9.5,-6.25) {bm head=up};
+\pic at (9.5,-5.25) {bm head=up};
+\pic at (9.75,-4.5) {bm head=right};
+\pic at (10.75,-4.5) {bm head=right};
+\pic at (6.5,-3.25) {bm head=up};
+\pic at (6.5,-2.25) {bm head=up};
+\pic at (6.5,-1.25) {bm head=up};
+\pic at (6.25,-0.5) {bm head=left};
+\pic at (5.5,-0.75) {bm head=down};
+\pic at (6.5,-4.75) {bm head=down};
+\pic at (6.75,-5.5) {bm head=right};
+\pic at (7.5,-5.25) {bm head=up};
+\pic at (7.5,-3.25) {bm head=up};
+\pic at (7.5,-2.25) {bm head=up};
+\pic at (7.5,-1.25) {bm head=up};
+\pic at (7.75,-0.5) {bm head=right};
+\pic at (8.75,-0.5) {bm head=right};
+\pic at (8.75,-3.5) {bm head=right};
+\pic at (10.75,-0.5) {bm head=right};
+\pic at (10.75,-1.5) {bm head=right};
+\pic at (10.75,-2.5) {bm head=right};
+\pic at (10.75,-3.5) {bm head=right};
+\pic at (3.5,-1.5) {bm entrance={right}};
+\pic at (3.5,-2.5) {bm entrance={right}};
+\pic at (3.5,-6.5) {bm entrance={right}};
+\pic at (5.5,-2.5) {bm entrance={down}};
+\pic at (5.5,-5.5) {bm exit={down}};
+\pic at (7.5,-6.5) {bm exit={right}};
+\pic at (8.5,-1.5) {bm exit={right}};
+\pic at (8.5,-2.5) {bm exit={right}};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (1.5,-3) {bm splitter={right}};
+\pic at (2.5,-2) {bm splitter={right}};
+\pic at (2.5,-6) {bm splitter={right}};
+\pic at (3.5,-5) {bm splitter={right}};
+\pic at (5,-1.5) {bm splitter={down}};
+\pic at (5,-6.5) {bm splitter={down}};
+\pic at (5.5,-4) {bm splitter={right}};
+\pic at (8,-4.5) {bm splitter={up}};
+\pic at (9.5,-1) {bm splitter={right}};
+\pic at (9.5,-3) {bm splitter={right}};
+\pic at (-0.28,-0.5) {bm mark=ok};
+\pic at (-0.28,-1.5) {bm mark=ok};
+\pic at (-0.28,-2.5) {bm mark=ok};
+\pic at (-0.28,-3.5) {bm mark=ok};
+\pic at (-0.28,-4.5) {bm mark=ok};
+\pic at (11.28,-0.5) {bm mark=ok};
+\pic at (11.28,-1.5) {bm mark=ok};
+\pic at (11.28,-2.5) {bm mark=ok};
+\pic at (11.28,-3.5) {bm mark=ok};
+\pic at (11.28,-4.5) {bm mark=ok};
+
+== tikz: wires, check, marks
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmc10}{RGB}{124,178,71}
+\definecolor{bmc11}{RGB}{198,19,161}
+\definecolor{bmc12}{RGB}{48,219,205}
+\definecolor{bmc13}{RGB}{178,138,71}
+\definecolor{bmc14}{RGB}{79,19,198}
+\definecolor{bmc15}{RGB}{48,219,55}
+\definecolor{bmc16}{RGB}{178,71,98}
+\definecolor{bmc17}{RGB}{19,116,198}
+\definecolor{bmc18}{RGB}{190,219,48}
+\definecolor{bmc19}{RGB}{165,71,178}
+\definecolor{bmc20}{RGB}{19,198,124}
+\definecolor{bmc21}{RGB}{219,98,48}
+\definecolor{bmc22}{RGB}{71,71,178}
+\definecolor{bmc23}{RGB}{72,198,19}
+\definecolor{bmc24}{RGB}{219,48,147}
+\definecolor{bmc25}{RGB}{71,165,178}
+\definecolor{bmc26}{RGB}{198,169,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{156,139,7}
+\definecolor{bmi2}{RGB}{55,199,164}
+\definecolor{bmi3}{RGB}{77,164,231}
+\definecolor{bmi4}{RGB}{179,121,200}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{156,139,7}
+\definecolor{bmp2}{RGB}{55,199,164}
+\definecolor{bmp3}{RGB}{77,164,231}
+\definecolor{bmp4}{RGB}{179,121,200}
+\definecolor{bmp5}{RGB}{246,146,132}
+\definecolor{bmp6}{RGB}{246,146,132}
+\definecolor{bmp7}{RGB}{65,197,164}
+\definecolor{bmp8}{RGB}{65,197,164}
+\definecolor{bmp9}{RGB}{243,147,133}
+\definecolor{bmp10}{RGB}{243,147,133}
+\definecolor{bmp11}{RGB}{179,122,199}
+\definecolor{bmp12}{RGB}{179,122,199}
+\definecolor{bmp13}{RGB}{241,147,134}
+\definecolor{bmp14}{RGB}{76,195,164}
+\definecolor{bmp15}{RGB}{76,195,164}
+\definecolor{bmp16}{RGB}{158,158,158}
+\definecolor{bmp17}{RGB}{241,147,134}
+\definecolor{bmp18}{RGB}{158,158,158}
+\definecolor{bmp19}{RGB}{158,158,158}
+\definecolor{bmp20}{RGB}{158,158,158}
+\definecolor{bmp21}{RGB}{177,124,197}
+\definecolor{bmp22}{RGB}{177,124,197}
+\definecolor{bmp23}{RGB}{158,158,158}
+\definecolor{bmp24}{RGB}{158,158,158}
+\definecolor{bmp25}{RGB}{158,158,158}
+\definecolor{bmp26}{RGB}{158,158,158}
+\begin{pgfonlayer}{bmarcs}
+\draw[bm w wire={bmp0}] (0,-4.2) -- (2.65,-4.2);
+\draw[bm w wire={bmp1}] (0,-7) -- (2.65,-7);
+\draw[bm w wire={bmp2}] (0,-1.4) -- (1.95,-1.4);
+\draw[bm w wire={bmp3}] (0,0) -- (1.95,0);
+\draw[bm w wire={bmp4}] (0,-2.8) -- (1.95,-2.8);
+\draw[bm w wire={bmp5}] (2.65,-7) -- (4.25,-7);
+\draw[bm w wire={bmp6}] (2.65,-4.2) -- (4.25,-4.2);
+\draw[bm w wire={bmp7}] (1.95,0) -- (4.25,0);
+\draw[bm w wire={bmp8}] (1.95,-1.4) -- (4.95,-1.4);
+\draw[bm w wire={bmp9}] (4.25,0) -- (11.5,0);
+\draw[bm w wire={bmp10}] (4.25,-4.2) -- (11.5,-4.2);
+\draw[bm w wire={bmp11}] (1.95,-5.6) -- (4.95,-5.6);
+\draw[bm w wire={bmp12}] (1.95,-2.8) -- (9.2,-2.8);
+\draw[bm w wire={bmp13}] (4.25,-8.4) -- (6.55,-8.4);
+\draw[bm w wire={bmp14}] (4.95,-1.4) -- (6.55,-1.4);
+\draw[bm w wire={bmp15}] (4.95,-5.6) -- (7.25,-5.6);
+\draw[bm w wire={bmp16}] (7.25,-5.6) -- (13.8,-5.6) .. controls (15.41,-5.6) and (15.41,-10.05) .. (13.8,-10.05) -- (0,-10.05) .. controls (-1.61,-10.05) and (-1.61,-5.6) .. (0,-5.6) -- (1.95,-5.6);
+\draw[bm w wire={bmp17}] (4.25,-7) -- (7.25,-7);
+\draw[bm w wire={bmp18}] (7.25,-7) -- (13.8,-7);
+\draw[bm w wire={bmp19}] (6.55,-8.4) -- (13.8,-8.4) .. controls (14.92,-8.4) and (14.92,-9.3) .. (13.8,-9.3) -- (0,-9.3) .. controls (-1.12,-9.3) and (-1.12,-8.4) .. (0,-8.4) -- (4.25,-8.4);
+\draw[bm w wire={bmp20}] (6.55,-1.4) -- (9.2,-1.4);
+\draw[bm w wire={bmp21}] (9.2,-1.4) -- (11.5,-1.4);
+\draw[bm w wire={bmp22}] (9.2,-2.8) -- (11.5,-2.8);
+\draw[bm w wire={bmp23}] (11.5,0) -- (13.8,0);
+\draw[bm w wire={bmp24}] (11.5,-1.4) -- (13.8,-1.4);
+\draw[bm w wire={bmp25}] (11.5,-2.8) -- (13.8,-2.8);
+\draw[bm w wire={bmp26}] (11.5,-4.2) -- (13.8,-4.2);
+\end{pgfonlayer}
+\draw[bm w bar] (2.65,-4.2) -- (2.65,-7);
+\node[bm w pad] at (2.65,-4.2) {};
+\node[bm w pad] at (2.65,-7) {};
+\draw[bm w bar] (1.95,0) -- (1.95,-1.4);
+\node[bm w pad] at (1.95,0) {};
+\node[bm w pad] at (1.95,-1.4) {};
+\draw[bm w bar] (1.95,-2.8) -- (1.95,-5.6);
+\node[bm w pad] at (1.95,-2.8) {};
+\node[bm w pad] at (1.95,-5.6) {};
+\draw[bm w bar] (4.25,0) -- (4.25,-4.2);
+\node[bm w pad] at (4.25,0) {};
+\node[bm w pad] at (4.25,-4.2) {};
+\draw[bm w bar] (4.95,-1.4) -- (4.95,-5.6);
+\node[bm w pad] at (4.95,-1.4) {};
+\node[bm w pad] at (4.95,-5.6) {};
+\draw[bm w bar] (4.25,-7) -- (4.25,-8.4);
+\node[bm w pad] at (4.25,-7) {};
+\node[bm w pad] at (4.25,-8.4) {};
+\draw[bm w bar] (7.25,-5.6) -- (7.25,-7);
+\node[bm w pad] at (7.25,-5.6) {};
+\node[bm w pad] at (7.25,-7) {};
+\draw[bm w bar] (6.55,-1.4) -- (6.55,-8.4);
+\node[bm w pad] at (6.55,-1.4) {};
+\node[bm w pad] at (6.55,-8.4) {};
+\draw[bm w bar] (9.2,-1.4) -- (9.2,-2.8);
+\node[bm w pad] at (9.2,-1.4) {};
+\node[bm w pad] at (9.2,-2.8) {};
+\draw[bm w bar] (11.5,0) -- (11.5,-1.4);
+\node[bm w pad] at (11.5,0) {};
+\node[bm w pad] at (11.5,-1.4) {};
+\draw[bm w bar] (11.5,-2.8) -- (11.5,-4.2);
+\node[bm w pad] at (11.5,-2.8) {};
+\node[bm w pad] at (11.5,-4.2) {};
+\node[bm g input] at (0,-4.2) {1};
+\pic at (-1,-4.2) {bm mark=ok};
+\node[bm g input] at (0,-7) {2};
+\pic at (-1,-7) {bm mark=ok};
+\node[bm g input] at (0,-1.4) {3};
+\pic at (-1,-1.4) {bm mark=ok};
+\node[bm g input] at (0,0) {4};
+\pic at (-1,0) {bm mark=ok};
+\node[bm g input] at (0,-2.8) {5};
+\pic at (-1,-2.8) {bm mark=ok};
+\node[bm g output] at (13.8,-7) {5};
+\pic at (14.8,-7) {bm mark=ok};
+\node[bm g output] at (13.8,0) {1};
+\pic at (14.8,0) {bm mark=ok};
+\node[bm g output] at (13.8,-1.4) {2};
+\pic at (14.8,-1.4) {bm mark=ok};
+\node[bm g output] at (13.8,-2.8) {3};
+\pic at (14.8,-2.8) {bm mark=ok};
+\node[bm g output] at (13.8,-4.2) {4};
+\pic at (14.8,-4.2) {bm mark=ok};

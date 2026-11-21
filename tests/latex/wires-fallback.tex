@@ -1,0 +1,12 @@
+% view=wires on a network it does not cover falls back to view=graph with a warning.
+% test: engine=lualatex
+% test: expect=ok
+% test: log-contains=view=wires: splitter 1 does not take two belts in and send two out; drawn as view=graph
+\documentclass{article}
+\usepackage{beltmap}
+\begin{document}
+\begin{beltgrid}[view=wires]
+> S> > \\
+. S> >
+\end{beltgrid}
+\end{document}

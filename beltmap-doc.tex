@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.5                                                        2026-11-21
+% beltmap 0.5.1                                                      2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -47,7 +47,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.5, 2026-11-21\par}
+		{\large version 0.5.1, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -250,6 +250,7 @@
 		\key{rulers} & & number the tiles of the inside along the top and left; \key{rulers=5}: every fifth \\
 		\key{dimensions} & \key{false} & the size of the inside in tiles, below and to the left \\
 		\key{ends}, \key{heads} & \key{true} & the shaded entry and exit lines, the arrowheads \\
+		\key{openends} & \key{true} & the stub of belt from a splitter's edge on a belt that runs straight to an output (\cs{beltglyph} turns it off) \\
 		\key{gap} & file, else 10 & longest tunnel for tiles without a tier \\
 		\key{pick}, \key{record} & & which search record of a \texttt{.jsonl} file \\
 		\key{index}, \key{label}, \key{factorio} & & which blueprint of a book; direction numbering, read and written \\
@@ -567,14 +568,14 @@ python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.g
 	\section{Game icons}
 	\label{sec:icons}
 
-	beltmap contains no game graphics. It reads the game's icons from your own copy of Factorio when the document is compiled. \verb|\beltmapicon[width]{item}| sets an item's icon in running text, \verb|\beltmapicon{iron-ore}| for iron ore, \verb|1.2em| wide unless a width is given. It works inside \key{inputs} and \key{outputs} labels, and a splitter with a filter shows the filtered item's icon over its diamond.
+	beltmap contains no game graphics. It reads the game's icons from your own copy of Factorio when the document is compiled. \verb|\beltmapicon[width]{item}| sets an item's icon in running text, \verb|\beltmapicon{iron-ore}| for iron ore, \verb|1.2em| wide unless a width is given. It works inside \key{inputs} and \key{outputs} labels, and a splitter with a filter shows the filtered item's icon over its diamond when the game's icon is found (otherwise the plain diamond, without a warning).
 
 	\begin{Verbatim}
 \beltmapset{factorio data=C:/Program Files (x86)/Steam/steamapps/common/Factorio/data}
 \begin{beltgrid}[inputs={\beltmapicon{iron-ore} iron, \beltmapicon{copper-ore} copper}]
 	\end{Verbatim}
 
-	\key{factorio data} names the game's \texttt{data} folder, the one that holds \texttt{base}. Without it beltmap tries \texttt{\$FACTORIO\_DATA}, then the usual Steam folders on Windows, Linux, and macOS, and the log names the folder it used. An item's icon is the one its prototype names in the game's sources, Space Age and other mods in the data folder included, so the names are the game's internal names: \texttt{iron-ore}, \texttt{electronic-circuit}, \texttt{turbo-splitter}. With no data folder, an unknown name, or \key{icons=false}, a placeholder with the item's initials takes the icon's place, as everywhere in this manual: \beltmapicon{iron-ore} \beltmapicon{electronic-circuit}. The log says why, except for \key{icons=false}.
+	\key{factorio data} names the game's \texttt{data} folder, the one that holds \texttt{base}. Without it beltmap tries \texttt{\$FACTORIO\_DATA}, then the usual Steam folders on Windows, Linux, and macOS, and the log names the folder it used. Setting the environment variable \texttt{BELTMAP\_NO\_ICON\_SEARCH} to \texttt{1} skips the usual folders, so that a build does not depend on what happens to be installed. An item's icon is the one its prototype names in the game's sources, Space Age and other mods in the data folder included, so the names are the game's internal names: \texttt{iron-ore}, \texttt{electronic-circuit}, \texttt{turbo-splitter}. With no data folder, an unknown name, or \key{icons=false}, a placeholder with the item's initials takes the icon's place, as everywhere in this manual: \beltmapicon{iron-ore} \beltmapicon{electronic-circuit}. The log says why, except for \key{icons=false}.
 
 	A PDF compiled with icons contains Wube Software's artwork. Check the game's terms before you publish one, or set \key{icons=false}. This manual is compiled with \key{icons=false}.
 

@@ -1,0 +1,40 @@
+name: canary
+
+# The whole suite on the NEWEST TeX Live, unpinned, once a week. ci.yml runs on a TeX Live frozen
+# by digest so that a check cannot change under a pull request; this job is how a change in TeX
+# Live (a new kernel, tagpdf, TikZ, LuaTeX) reaches us before the pin is moved. A red canary is a
+# heads-up, not a broken main: read the log, fix the package or wait for upstream, then move
+# CI_IMAGE in ci.yml.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Everything on texlive/texlive:latest
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w texlive/texlive:latest sh -euc '
+            tex --version | head -n 1
+            apt-get update -qq && apt-get install -y -qq python3 poppler-utils >/dev/null
+            texlua tests/run.lua
+            python3 tests/run_latex.py
+            python3 build.py
+            python3 tests/check_dist.py'
+      - name: Keep the runs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: canary-runs
+          path: |
+            tests/tmp/latex/
+            tests/golden/actual/
+          if-no-files-found: ignore

@@ -1,0 +1,12 @@
+% No game anywhere (the runner sets BELTMAP_NO_ICON_SEARCH and clears FACTORIO_DATA): a
+% placeholder and one warning.
+% test: engine=lualatex
+% test: expect=ok
+% test: no-game=yes
+% test: pdf-images=0
+% test: log-contains=no Factorio data folder was found
+\documentclass{article}
+\usepackage{beltmap}
+\begin{document}
+\beltmapicon{iron-ore} \beltmapicon{copper-ore}
+\end{document}

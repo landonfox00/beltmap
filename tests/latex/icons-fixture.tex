@@ -1,0 +1,19 @@
+% Game icons from a fake game folder made by the runner (no game graphics are in the repository).
+% test: engine=lualatex
+% test: expect=ok
+% test: fixture=factorio
+% test: log-contains=beltmap: game icons from
+% test: log-contains=no icon for not-an-item
+% test: pdf-images>=2
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\beltmapset{factorio data=\fixturedata}
+\begin{document}
+Inline \beltmapicon{widget} and \beltmapicon[2em]{gizmo}, and a placeholder \beltmapicon{not-an-item}.
+
+\begin{beltgrid}[inputs={\beltmapicon{widget}, \beltmapicon{gizmo}}]
+> S>[filter=widget, out=right] > \\
+> S> >
+\end{beltgrid}
+\end{document}

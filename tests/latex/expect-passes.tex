@@ -1,0 +1,17 @@
+% Every expect value, each where it holds.
+% test: engine=lualatex
+% test: expect=ok
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\begin{document}
+\beltlayout[expect={balanced, lanes, throughput, blocked-unbalanced, input-balanced}]{\examples/f00_9x10.json}
+\begin{beltgrid}[expect={balanced, limited, input-balanced}]
+> S> > S> > \\
+> S> . S> >
+\end{beltgrid}
+\begin{beltgrid}[expect={balanced, blocked, input-unbalanced}]
+> S>[in=left] > \\
+> S> >
+\end{beltgrid}
+\end{document}

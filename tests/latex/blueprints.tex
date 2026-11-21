@@ -1,0 +1,14 @@
+% Blueprint strings written beside the PDF and attached to it, and the book.
+% test: engine=lualatex
+% test: expect=ok
+% test: attachments>=3
+% test: file-exists=blueprints-blueprint-1.txt
+% test: file-exists=blueprints-book.txt
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\begin{document}
+\beltlayout[blueprint, blueprint label={f00}]{\examples/f00_9x10.json}
+\beltlayout[blueprint, factorio=1.1]{\examples/f04_11x8.txt}
+\beltmapbook[examples]
+\end{document}

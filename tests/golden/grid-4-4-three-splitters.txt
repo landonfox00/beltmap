@@ -1,0 +1,206 @@
+inputs 4, outputs 4, splitters 3, tunnels 0, exact true
+output 1: 1/2 1/2 0 0
+output 2: 1/4 1/4 1/4 1/4
+output 3: 1/4 1/4 1/4 1/4
+output 4: 0 0 1/2 1/2
+balance: not balanced: output 1 carries 50\% of input 1, not 25\%
+lanes: lanes not kept: the left lane of output 1 carries 50\% of the left lane of input 1, not 25\%
+throughput: limited: inputs 1 to outputs 4 get at most 0 of 1 belt (no belt leads from those inputs to those outputs)
+blocked: not balanced with output 1 blocked: output 4 carries 0\% of input 1, not 33.3\% (11 of 14 choices fail, at light load)
+inputs: not input balanced: input 1 supplies 50\% of output 1's demand, not 25\% (at full backpressure)
+wires: 3 |101123212||0123
+alt: Belt layout of 5 by 4 tiles with 3 splitters and 0 underground tunnels; 4 inputs enter on the left and 4 outputs leave on the right. Belts are colored by the inputs they carry; the layout is not balanced: output 1 carries 50 percent of input 1, not 25 percent. Throughput: limited: inputs 1 to outputs 4 get at most 0 of 1 belt (no belt leads from those inputs to those outputs). With outputs blocked: not balanced with output 1 blocked: output 4 carries 0 percent of input 1, not 33.3 percent (11 of 14 choices fail, at light load). Input balance: not input balanced: input 1 supplies 50 percent of output 1's demand, not 25 percent (at full backpressure).
+caption: 4--4 \textperiodcentered\ 3$\times$4 \textperiodcentered\ 3 splitters \textperiodcentered\ 0 tunnels \textperiodcentered\ not balanced \textperiodcentered\ throughput limited \textperiodcentered\ unbalanced when blocked \textperiodcentered\ not input balanced
+
+== tikz: layout, mix
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{131,149,43}
+\definecolor{bmi2}{RGB}{16,201,222}
+\definecolor{bmi3}{RGB}{150,119,206}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{131,149,43}
+\definecolor{bmp2}{RGB}{16,201,222}
+\definecolor{bmp3}{RGB}{150,119,206}
+\definecolor{bmp4}{RGB}{193,150,91}
+\definecolor{bmp5}{RGB}{193,150,91}
+\definecolor{bmp6}{RGB}{118,162,215}
+\definecolor{bmp7}{RGB}{118,162,215}
+\definecolor{bmp8}{RGB}{158,158,158}
+\definecolor{bmp9}{RGB}{158,158,158}
+\path[bm grid] (0,0) grid[step=1] (5,-4);
+\path[bm end] (0,0) rectangle (1,-4);
+\path[bm end] (4,0) rectangle (5,-4);
+\path[bm frame] (0,0) rectangle (5,-4);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (0,-2.5) -- (1.21,-2.5);
+\path[bm belt=bmp3] (0,-3.5) -- (1.21,-3.5);
+\path[bm belt=bmp4] (1.79,-0.5) -- (5,-0.5);
+\path[bm belt=bmp5] (1.79,-1.5) -- (3.21,-1.5);
+\path[bm belt=bmp6] (1.79,-2.5) -- (3.21,-2.5);
+\path[bm belt=bmp7] (1.79,-3.5) -- (5,-3.5);
+\path[bm belt=bmp8] (3.79,-1.5) -- (5,-1.5);
+\path[bm belt=bmp9] (3.79,-2.5) -- (5,-2.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (0.75,-2.5) {bm head=right};
+\pic at (0.75,-3.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.75,-0.5) {bm head=right};
+\pic at (2.75,-1.5) {bm head=right};
+\pic at (2.75,-2.5) {bm head=right};
+\pic at (2.75,-3.5) {bm head=right};
+\pic at (3.75,-3.5) {bm head=right};
+\pic at (4.75,-3.5) {bm head=right};
+\pic at (4.75,-1.5) {bm head=right};
+\pic at (4.75,-2.5) {bm head=right};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (1.5,-3) {bm splitter={right}};
+\pic at (3.5,-2) {bm splitter={right}};
+\node[bm label, anchor=east] at (0,-0.5) {1};
+\node[bm label, anchor=east] at (0,-1.5) {2};
+\node[bm label, anchor=east] at (0,-2.5) {3};
+\node[bm label, anchor=east] at (0,-3.5) {4};
+\node[bm label, anchor=west] at (5,-0.5) {1};
+\node[bm label, anchor=west] at (5,-1.5) {2};
+\node[bm label, anchor=west] at (5,-2.5) {3};
+\node[bm label, anchor=west] at (5,-3.5) {4};
+
+== tikz: layout, strict, marks, throughput
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{131,149,43}
+\definecolor{bmi2}{RGB}{16,201,222}
+\definecolor{bmi3}{RGB}{150,119,206}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{131,149,43}
+\definecolor{bmp2}{RGB}{16,201,222}
+\definecolor{bmp3}{RGB}{150,119,206}
+\definecolor{bmp4}{RGB}{193,150,91}
+\definecolor{bmp5}{RGB}{193,150,91}
+\definecolor{bmp6}{RGB}{118,162,215}
+\definecolor{bmp7}{RGB}{118,162,215}
+\definecolor{bmp8}{RGB}{158,158,158}
+\definecolor{bmp9}{RGB}{158,158,158}
+\path[bm grid] (0,0) grid[step=1] (5,-4);
+\path[bm end] (0,0) rectangle (1,-4);
+\path[bm end] (4,0) rectangle (5,-4);
+\path[bm frame] (0,0) rectangle (5,-4);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (0,-2.5) -- (1.21,-2.5);
+\path[bm belt=bmp3] (0,-3.5) -- (1.21,-3.5);
+\path[bm belt=bmp4] (1.79,-0.5) -- (5,-0.5);
+\path[bm belt=bmp5] (1.79,-1.5) -- (3.21,-1.5);
+\path[bm belt=bmp6] (1.79,-2.5) -- (3.21,-2.5);
+\path[bm belt=bmp7] (1.79,-3.5) -- (5,-3.5);
+\path[bm belt=bmp8] (3.79,-1.5) -- (5,-1.5);
+\path[bm belt=bmp9] (3.79,-2.5) -- (5,-2.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (0.75,-2.5) {bm head=right};
+\pic at (0.75,-3.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.75,-0.5) {bm head=right};
+\pic at (2.75,-1.5) {bm head=right};
+\pic at (2.75,-2.5) {bm head=right};
+\pic at (2.75,-3.5) {bm head=right};
+\pic at (3.75,-3.5) {bm head=right};
+\pic at (4.75,-3.5) {bm head=right};
+\pic at (4.75,-1.5) {bm head=right};
+\pic at (4.75,-2.5) {bm head=right};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (1.5,-3) {bm splitter={right}};
+\pic at (3.5,-2) {bm splitter={right}};
+\pic at (-0.28,-0.5) {bm mark=bad};
+\pic at (-0.28,-1.5) {bm mark=bad};
+\pic at (-0.28,-2.5) {bm mark=bad};
+\pic at (-0.28,-3.5) {bm mark=bad};
+\pic at (5.28,-0.5) {bm mark=bad};
+\pic at (5.28,-1.5) {bm mark=ok};
+\pic at (5.28,-2.5) {bm mark=ok};
+\pic at (5.28,-3.5) {bm mark=bad};
+
+== tikz: wires, check, marks
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmc6}{RGB}{162,48,219}
+\definecolor{bmc7}{RGB}{71,178,111}
+\definecolor{bmc8}{RGB}{198,35,19}
+\definecolor{bmc9}{RGB}{48,83,219}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{131,149,43}
+\definecolor{bmi2}{RGB}{16,201,222}
+\definecolor{bmi3}{RGB}{150,119,206}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{131,149,43}
+\definecolor{bmp2}{RGB}{16,201,222}
+\definecolor{bmp3}{RGB}{150,119,206}
+\definecolor{bmp4}{RGB}{245,146,132}
+\definecolor{bmp5}{RGB}{245,146,132}
+\definecolor{bmp6}{RGB}{46,198,218}
+\definecolor{bmp7}{RGB}{46,198,218}
+\definecolor{bmp8}{RGB}{158,158,158}
+\definecolor{bmp9}{RGB}{158,158,158}
+\begin{pgfonlayer}{bmarcs}
+\draw[bm w wire={bmp0}] (0,0) -- (2.3,0);
+\draw[bm w wire={bmp1}] (0,-1.4) -- (2.3,-1.4);
+\draw[bm w wire={bmp2}] (0,-2.8) -- (2.3,-2.8);
+\draw[bm w wire={bmp3}] (0,-4.2) -- (2.3,-4.2);
+\draw[bm w wire={bmp4}] (2.3,0) -- (6.9,0);
+\draw[bm w wire={bmp5}] (2.3,-1.4) -- (4.6,-1.4);
+\draw[bm w wire={bmp6}] (2.3,-2.8) -- (4.6,-2.8);
+\draw[bm w wire={bmp7}] (2.3,-4.2) -- (6.9,-4.2);
+\draw[bm w wire={bmp8}] (4.6,-1.4) -- (6.9,-1.4);
+\draw[bm w wire={bmp9}] (4.6,-2.8) -- (6.9,-2.8);
+\end{pgfonlayer}
+\draw[bm w bar] (2.3,0) -- (2.3,-1.4);
+\node[bm w pad] at (2.3,0) {};
+\node[bm w pad] at (2.3,-1.4) {};
+\draw[bm w bar] (2.3,-2.8) -- (2.3,-4.2);
+\node[bm w pad] at (2.3,-2.8) {};
+\node[bm w pad] at (2.3,-4.2) {};
+\draw[bm w bar] (4.6,-1.4) -- (4.6,-2.8);
+\node[bm w pad] at (4.6,-1.4) {};
+\node[bm w pad] at (4.6,-2.8) {};
+\node[bm g input] at (0,0) {1};
+\pic at (-1,0) {bm mark=bad};
+\node[bm g input] at (0,-1.4) {2};
+\pic at (-1,-1.4) {bm mark=bad};
+\node[bm g input] at (0,-2.8) {3};
+\pic at (-1,-2.8) {bm mark=bad};
+\node[bm g input] at (0,-4.2) {4};
+\pic at (-1,-4.2) {bm mark=bad};
+\node[bm g output] at (6.9,0) {1};
+\pic at (7.9,0) {bm mark=bad};
+\node[bm g output] at (6.9,-4.2) {4};
+\pic at (7.9,-4.2) {bm mark=bad};
+\node[bm g output] at (6.9,-1.4) {2};
+\pic at (7.9,-1.4) {bm mark=ok};
+\node[bm g output] at (6.9,-2.8) {3};
+\pic at (7.9,-2.8) {bm mark=ok};

@@ -1,0 +1,17 @@
+% icons=false: placeholders only, no raster image, and no warning about it.
+% test: engine=lualatex
+% test: expect=ok
+% test: fixture=factorio
+% test: pdf-images=0
+% test: log-lacks=beltmap warning
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\beltmapset{factorio data=\fixturedata, icons=false}
+\begin{document}
+\beltmapicon{widget} \beltmapicon{gizmo}
+\begin{beltgrid}
+> S>[filter=widget, out=right] > \\
+> S> >
+\end{beltgrid}
+\end{document}

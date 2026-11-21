@@ -900,7 +900,8 @@ end
 local function frac_tex(v)
 	if type(v) == 'table' then
 		if v.d == 1 then return tostring(v.n) end
-		return string.format('\\tfrac{%d}{%d}', v.n, v.d)
+		-- \frac, not \tfrac: in text math they are the same, and \tfrac needs amsmath
+		return string.format('\\frac{%d}{%d}', v.n, v.d)
 	end
 	return (string.format('%.4f', v):gsub('0+$', ''):gsub('%.$', ''))
 end
@@ -1747,9 +1748,11 @@ function M.tikz(state)
 			local idx = 0
 			for j, f in ipairs(tr.filters) do if f == s.filter then idx = j - 1 end end
 			o[#o + 1] = 'filter, filter color=bmf' .. (idx % 6)
-			-- the filtered item's icon over the diamond, from the reader's copy of the game
+			-- the filtered item's icon over the diamond, when the reader's copy of the game has it;
+			-- otherwise the plain diamond, without a warning
 			if opts.icons ~= false and M.icon_opts then
-				o[#o + 1] = 'filter icon={' .. M.icon_tex(M.filter_item(s.filter), '0.62\\bmunit') .. '}'
+				local icon = M.icon_tex(M.filter_item(s.filter), '0.62\\bmunit', true)
+				if icon then o[#o + 1] = 'filter icon={' .. icon .. '}' end
 			end
 		end
 		if trim then o[#o + 1] = 'trim=' .. ((s.tier and TIERS[s.tier]) and s.tier or 'yellow') end
@@ -2557,7 +2560,11 @@ local function factorio_data()
 	local list = {}
 	if given then list[#list + 1] = given end
 	if os.getenv('FACTORIO_DATA') then list[#list + 1] = os.getenv('FACTORIO_DATA') end
-	for _, p in ipairs(ICON_PLACES) do list[#list + 1] = p end
+	-- BELTMAP_NO_ICON_SEARCH=1: only the folders named above, for builds that must not depend on
+	-- what happens to be installed on the machine
+	if (os.getenv('BELTMAP_NO_ICON_SEARCH') or '') == '' then
+		for _, p in ipairs(ICON_PLACES) do list[#list + 1] = p end
+	end
 	for _, p in ipairs(list) do
 		p = p:gsub('^~', home):gsub('\\', '/'):gsub('/$', '')
 		if is_dir(p .. '/base/graphics/icons') then
@@ -2632,21 +2639,57 @@ local function initials(name)
 	return s:sub(1, 3)
 end
 
--- TeX for the icon of item name at the given width: the game's icon, or a placeholder.
-function M.icon_tex(name, width)
+-- The size of a PNG in big points, as LuaTeX sets it (pixels at the pHYs resolution, else
+-- 72 dpi), read from the file itself: or nil when the file is not a PNG.  img.scan is not used
+-- for this because LuaTeX crashes, uncatchably, on a file that is not a valid image.
+local function png_size(path)
+	local f = io.open(path, 'rb')
+	if not f then return nil end
+	local head = f:read(8)
+	if head ~= '\137PNG\r\n\26\n' then f:close() return nil end
+	local w, h, xppm, yppm
+	while true do
+		local len_type = f:read(8)
+		if not len_type or #len_type < 8 then break end
+		local len = string.unpack('>I4', len_type)
+		local typ = len_type:sub(5, 8)
+		if typ == 'IHDR' then
+			local d = f:read(len)
+			if not d or #d < 8 then break end
+			w, h = string.unpack('>I4>I4', d)
+		elseif typ == 'pHYs' then
+			local d = f:read(len)
+			if d and #d >= 9 and d:byte(9) == 1 then xppm, yppm = string.unpack('>I4>I4', d) end
+		elseif typ == 'IDAT' or typ == 'IEND' then
+			break
+		else
+			f:seek('cur', len)
+		end
+		f:seek('cur', 4) -- the CRC
+	end
+	f:close()
+	if not (w and h and w > 0 and h > 0) then return nil end
+	local function bp(px, ppm) return (ppm and ppm > 0) and (px * 72 / (ppm * 0.0254)) or px end
+	return bp(w, xppm), bp(h, yppm)
+end
+M.png_size = png_size
+
+-- TeX for the icon of item name at the given width: the game's icon, or a placeholder.  With
+-- quiet, nil instead of a placeholder and no warning: a picture's filter keeps its plain diamond
+-- when the game's icon is not at hand.
+function M.icon_tex(name, width, quiet)
 	local p, why
 	if not (M.icon_opts and M.icon_opts.off) then p, why = M.icon_file(name) else why = 'icons=false' end
 	if p then
-		local im = img and img.scan({ filename = p })
-		local vp = '0 0 64 64'
-		if im and im.xsize and im.xsize > 0 then
-			-- the leftmost square, in the image's own big points
-			local wbp, hbp = im.width / 65536 * 72 / 72.27, im.height / 65536 * 72 / 72.27
-			local side = hbp
-			vp = string.format('0 0 %.4f %.4f', side * math.min(1, wbp / hbp), hbp)
+		local wbp, hbp = png_size(p)
+		if wbp then
+			-- the leftmost square: a game icon holds its mipmaps side by side
+			local vp = string.format('0 0 %.4f %.4f', hbp * math.min(1, wbp / hbp), hbp)
+			return string.format('\\BeltmapIconImage{%s}{%s}{%s}', vp, width, p)
 		end
-		return string.format('\\BeltmapIconImage{%s}{%s}{%s}', vp, width, p)
+		why = 'the icon of ' .. name .. ' is not a PNG file'
 	end
+	if quiet then return nil end
 	if why and why ~= 'icons=false' and not icon_warned[why] and texio then
 		icon_warned[why] = true
 		texio.write_nl('term and log', 'beltmap warning: ' .. why .. '; drawing a placeholder')

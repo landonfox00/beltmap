@@ -1,0 +1,173 @@
+name: ci
+
+# What a change has to get past.
+#
+#   static     no TeX: text hygiene, versions agree, license headers, every key documented,
+#              nothing leaked, no binaries (tests/check_repo.py). Seconds; everything waits on it.
+#   lua        the Lua suite: exact shares, verdicts, blocked outputs, demand, the colorings,
+#              view=wires, blueprints, icon lookup, and the golden snapshots (tests/run.lua).
+#   documents  real documents through real engines: pdfLaTeX and XeLaTeX are refused, the TikZ
+#              library runs anywhere, expect= stops a wrong build, tagged output passes veraPDF,
+#              blueprints attach, icons come from a fake game folder, the export script works
+#              (tests/run_latex.py).
+#   manual     build.py: the manual compiles with every expect= in it holding, the leak scan and
+#              the no-raster-image rule pass, the CTAN archive has exactly the right files
+#              (tests/check_dist.py), and the manual is PDF/UA-2. The archive and manual are
+#              kept as artifacts.
+#   minimum    TeX Live 2024: the oldest TeX Live the package claims (\NeedsTeXFormat 2024-06-01).
+#   windows    the Lua suite and the main documents on Windows, through tlmgr.
+#
+# Toolchain. The blocking jobs run TeXLib's CI image BY DIGEST: TeX Live 2026 (texlive-full
+# 20260701) with poppler and veraPDF 1.30.2 in the image, so nothing a gate measures can change
+# until the digest is moved on purpose. TeXLib learned this the hard way: an unpinned TeX Live
+# roll changed tagpdf and broke PDF/UA conformance, and job-time package installs failed when
+# Alpine dropped a pinned version. canary.yml runs the same suite on the newest TeX Live every
+# week, so a coming break shows up there first. Actions are pinned by commit SHA (dependabot
+# proposes bumps).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # TeXLib's image: texlive-full 20260701 + poppler + veraPDF 1.30.2 (+ python3). Public, by digest.
+  CI_IMAGE: ghcr.io/landonfox00/texlib-ci:20261104-b3d4fa5@sha256:4412e258f79649c3f3e2aed1a87635959297cc870281cced384c3cf60790dc28
+  # The oldest TeX Live the package supports, frozen.
+  MIN_IMAGE: texlive/texlive:TL2024-historic@sha256:1457d4e2926de8c20974be313b774f8680e1d1b49c027365c2486a738de59bd8
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Repository checks
+        run: python3 tests/check_repo.py
+
+  lua:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lua suite (TeX Live 2026, pinned)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w "$CI_IMAGE" sh -euc '
+            cat /etc/texlib-ci/manifest
+            texlua tests/run.lua'
+      - name: Keep the snapshots that differ
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: golden-actual
+          path: tests/golden/actual/
+          if-no-files-found: ignore
+
+  documents:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test documents (TeX Live 2026, pinned)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w "$CI_IMAGE" sh -euc '
+            "$TEXLIB_VERAPDF_HOME/verapdf" --version
+            python3 tests/run_latex.py --verapdf "$TEXLIB_VERAPDF_HOME/verapdf"'
+      - name: Keep the runs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: document-runs
+          path: tests/tmp/latex/
+
+  manual:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build the manual and the CTAN archive (TeX Live 2026, pinned)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w "$CI_IMAGE" sh -euc '
+            python3 build.py
+            python3 tests/check_dist.py
+            out=$("$TEXLIB_VERAPDF_HOME/verapdf" --flavour ua2 build/beltmap/beltmap-doc.pdf)
+            echo "$out" | grep -o "isCompliant=\"[a-z]*\"" | head -n 1
+            echo "$out" | grep -q "isCompliant=\"true\"" || { echo "the manual is not PDF/UA-2"; exit 1; }'
+      - name: Keep the archive and the manual
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: beltmap-ctan
+          path: |
+            build/beltmap.zip
+            build/beltmap/beltmap-doc.pdf
+          if-no-files-found: ignore
+          retention-days: 30
+
+  minimum:
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lua suite and documents on TeX Live 2024
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w "$MIN_IMAGE" sh -euc '
+            tex --version | head -n 1
+            command -v python3 >/dev/null || { apt-get update -qq && apt-get install -y -qq python3 poppler-utils >/dev/null; }
+            command -v pdfimages >/dev/null || { apt-get update -qq && apt-get install -y -qq poppler-utils >/dev/null; }
+            texlua tests/run.lua
+            python3 tests/run_latex.py --no-export'
+      - name: Keep the runs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: minimum-runs
+          path: |
+            tests/tmp/latex/
+            tests/golden/actual/
+          if-no-files-found: ignore
+
+  windows:
+    needs: static
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: TeX-Live/setup-texlive-action@eb78d21f41941476d9121e3a0abcab73265c876f # v4.1.1
+        with:
+          packages: |
+            scheme-basic
+            collection-luatex
+            collection-xetex
+            fontspec
+            pgf
+            xcolor
+            tools
+            geometry
+            embedfile
+            lm
+      - name: Lua suite
+        run: texlua tests/run.lua
+      - name: Documents
+        run: python tests/run_latex.py --allow-missing-tools --no-export engine keys-smoke expect wires-fallback icons-none tikzlib
+      - name: Keep the runs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-runs
+          path: |
+            tests/tmp/latex/
+            tests/golden/actual/
+          if-no-files-found: ignore
