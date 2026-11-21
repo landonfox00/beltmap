@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.2                                                        2026-11-21
+% beltmap 0.3                                                        2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -31,6 +31,9 @@
 \usepackage{tabularx}
 \usepackage{beltmap}
 \usepackage[hidelinks]{hyperref}
+% No game graphics in the distributed manual: every icon is the placeholder (section Game icons).
+% build.py refuses a manual that holds any raster image.
+\beltmapset{icons=false}
 
 \fvset{fontsize=\small, numbers=none, frame=leftline, framerule=0.6pt, rulecolor=\color{black!25}, xleftmargin=4pt}
 \newcommand\cs[1]{\texttt{\textbackslash#1}}
@@ -44,7 +47,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.2, 2026-11-21\par}
+		{\large version 0.3, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -232,6 +235,8 @@
 		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}: stop when the layout is not so (section~\ref{sec:exact}) \\
 		\key{throughput} & \key{false} & run the max-flow test and mark the cut (section~\ref{sec:tp}) \\
 		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}); \key{wires}: the wire diagram (section~\ref{sec:wires}) \\
+		\key{icons} & \key{true} & game icons from your copy of Factorio, or placeholders with \key{false} (section~\ref{sec:icons}) \\
+		\key{factorio data} & found & the game's \texttt{data} folder \\
 		\key{numbers} & \key{false} & splitter numbers on the layout, as in the graph \\
 		\key{compare} & & a layout file: mark the tiles that differ from it \\
 		\key{step} & & one step of the flow, as in \cs{beltanimation} \\
@@ -481,6 +486,20 @@ python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.g
 	\begin{center}
 		\beltanimation[tile=1.9mm, grid=false]{examples/f00_9x10.json}
 	\end{center}
+
+	\section{Game icons}
+	\label{sec:icons}
+
+	beltmap contains no game graphics. It reads the game's icons from your own copy of Factorio when the document is compiled. \verb|\beltmapicon[width]{item}| sets an item's icon in running text, \verb|\beltmapicon{iron-ore}| for iron ore, \verb|1.2em| wide unless a width is given. It works inside \key{inputs} and \key{outputs} labels, and a splitter with a filter shows the filtered item's icon over its diamond.
+
+	\begin{Verbatim}
+\beltmapset{factorio data=C:/Program Files (x86)/Steam/steamapps/common/Factorio/data}
+\begin{beltgrid}[inputs={\beltmapicon{iron-ore} iron, \beltmapicon{copper-ore} copper}]
+	\end{Verbatim}
+
+	\key{factorio data} names the game's \texttt{data} folder, the one that holds \texttt{base}. Without it beltmap tries \texttt{\$FACTORIO\_DATA}, then the usual Steam folders on Windows, Linux, and macOS, and the log names the folder it used. An item's icon is the one its prototype names in the game's sources, Space Age and other mods in the data folder included, so the names are the game's internal names: \texttt{iron-ore}, \texttt{electronic-circuit}, \texttt{turbo-splitter}. With no data folder, an unknown name, or \key{icons=false}, a placeholder with the item's initials takes the icon's place, as everywhere in this manual: \beltmapicon{iron-ore} \beltmapicon{electronic-circuit}. The log says why, except for \key{icons=false}.
+
+	A PDF compiled with icons contains Wube Software's artwork. Check the game's terms before you publish one, or set \key{icons=false}. This manual is compiled with \key{icons=false}.
 
 	\section{Accessibility}
 

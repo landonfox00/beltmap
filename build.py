@@ -96,6 +96,15 @@ def main():
 				os.remove(os.path.join(STAGE, fn))
 
 	hits = scan()
+	# The package ships no game graphics; every picture of the manual is vector, so any raster
+	# image in it can only be a game icon that slipped in (the manual sets icons=false).
+	pdf = os.path.join(STAGE, 'beltmap-doc.pdf')
+	if os.path.exists(pdf) and re.search(rb'/Subtype\s*/Image', open(pdf, 'rb').read() + pdf_text(pdf).encode('latin-1')):
+		hits.append('beltmap-doc.pdf: holds a raster image (a game icon?); build the manual with icons=false')
+	for root, _, files in os.walk(STAGE):
+		for fn in files:
+			if fn.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+				hits.append(os.path.relpath(os.path.join(root, fn), STAGE) + ': image files are not shipped')
 	if hits:
 		print('\n'.join(hits))
 		raise SystemExit('leak scan: %d hit(s); nothing zipped' % len(hits))

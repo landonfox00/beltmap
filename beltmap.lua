@@ -1531,6 +1531,10 @@ function M.tikz(state)
 			local idx = 0
 			for j, f in ipairs(tr.filters) do if f == s.filter then idx = j - 1 end end
 			o[#o + 1] = 'filter, filter color=bmf' .. (idx % 6)
+			-- the filtered item's icon over the diamond, from the reader's copy of the game
+			if opts.icons ~= false and M.icon_opts then
+				o[#o + 1] = 'filter icon={' .. M.icon_tex(M.filter_item(s.filter), '0.62\\bmunit') .. '}'
+			end
 		end
 		if trim then o[#o + 1] = 'trim=' .. ((s.tier and TIERS[s.tier]) and s.tier or 'yellow') end
 		if opts.numbers then o[#o + 1] = 'number=' .. si end
@@ -1993,6 +1997,8 @@ local function tex_options(L)
 	o.numbers = bool('numbers')
 	o.compare = topt('compare')
 	o.view = topt('view')
+	M.icon_opts = { data = topt('factoriodata'), off = (topt('icons') == 'false') }
+	o.icons = not M.icon_opts.off
 	o.ends, o.heads, o.lanes = bool('ends'), bool('heads'), bool('lanes')
 	local grid = topt('grid')
 	if grid == 'false' or grid == 'none' then
@@ -2264,6 +2270,142 @@ end
 function M.emit()
 	if not current then return end
 	print_lines(M.tikz(current))
+end
+
+-- ------------------------------------------------------------------ game icons
+-- beltmap ships no game graphics.  With icons on, it reads them from the reader's own copy of
+-- Factorio: the data folder given by factorio data=, else $FACTORIO_DATA, else the usual Steam
+-- places.  An item's icon file is the one its prototype names (icon = "__mod__/..."), read from
+-- the prototype sources of every mod in the data folder; a game icon holds mipmaps side by side,
+-- and only the full-size square on the left is shown.  Without a data folder, or for an unknown
+-- name, a placeholder with the item's initials is drawn instead, and the log says why.
+
+local ICON_PLACES = {
+	'C:/Program Files (x86)/Steam/steamapps/common/Factorio/data',
+	'C:/Program Files/Steam/steamapps/common/Factorio/data',
+	'C:/Program Files/Factorio/data',
+	'~/.steam/steam/steamapps/common/Factorio/data',
+	'~/.local/share/Steam/steamapps/common/Factorio/data',
+	'~/Library/Application Support/Steam/steamapps/common/Factorio/factorio.app/Contents/data',
+	'/Applications/factorio.app/Contents/data',
+}
+
+local icon_index, icon_dir, icon_warned = nil, nil, {}
+
+local function is_dir(p)
+	return lfs and lfs.attributes(p, 'mode') == 'directory'
+end
+
+local icon_given
+local function factorio_data()
+	local given = M.icon_opts and M.icon_opts.data
+	if icon_dir ~= nil and icon_given == given then return icon_dir or nil end
+	icon_given, icon_index = given, nil
+	local home = os.getenv('HOME') or os.getenv('USERPROFILE') or ''
+	local list = {}
+	if given then list[#list + 1] = given end
+	if os.getenv('FACTORIO_DATA') then list[#list + 1] = os.getenv('FACTORIO_DATA') end
+	for _, p in ipairs(ICON_PLACES) do list[#list + 1] = p end
+	for _, p in ipairs(list) do
+		p = p:gsub('^~', home):gsub('\\', '/'):gsub('/$', '')
+		if is_dir(p .. '/base/graphics/icons') then
+			icon_dir = p
+			if texio then texio.write_nl('log', 'beltmap: game icons from ' .. p) end
+			return p
+		end
+	end
+	icon_dir = false
+	return nil
+end
+
+-- name -> { mod, path } from the prototype sources: the first icon = "__mod__/..." after each
+-- name = "...", item files first.
+local function build_index(data)
+	local idx = {}
+	local files = {}
+	local function walk(dir)
+		for f in lfs.dir(dir) do
+			if f ~= '.' and f ~= '..' then
+				local p = dir .. '/' .. f
+				if is_dir(p) then walk(p) elseif f:match('%.lua$') then files[#files + 1] = p end
+			end
+		end
+	end
+	for mod in lfs.dir(data) do
+		if mod ~= '.' and mod ~= '..' and is_dir(data .. '/' .. mod .. '/prototypes') then walk(data .. '/' .. mod .. '/prototypes') end
+	end
+	table.sort(files, function(a, b)
+		local ia, ib = a:match('/item[^/]*%.lua$') and 0 or 1, b:match('/item[^/]*%.lua$') and 0 or 1
+		if ia ~= ib then return ia < ib end
+		return a < b
+	end)
+	for _, p in ipairs(files) do
+		local fh = io.open(p, 'r')
+		if fh then
+			local text = fh:read('*a')
+			fh:close()
+			local names = {}
+			for pos, nm in text:gmatch('()name%s*=%s*"([^"]+)"') do names[#names + 1] = { pos, nm } end
+			for i, nm in ipairs(names) do
+				if not idx[nm[2]] then
+					local stop = names[i + 1] and names[i + 1][1] or #text
+					local seg = text:sub(nm[1], stop)
+					local mod, path = seg:match('icon%s*=%s*"__([%w%-_]+)__/([^"]+%.png)"')
+					if mod then idx[nm[2]] = { mod, path } end
+				end
+			end
+		end
+	end
+	return idx
+end
+
+-- The icon file of an item, or nil and the reason.
+function M.icon_file(name)
+	local data = factorio_data()
+	if not data then return nil, 'no Factorio data folder was found (set factorio data=)' end
+	if not icon_index then icon_index = build_index(data) end
+	local e = icon_index[name]
+	local p
+	if e then p = data .. '/' .. e[1] .. '/' .. e[2] end
+	if not (p and lfs.attributes(p)) then
+		p = data .. '/base/graphics/icons/' .. name .. '.png'
+		if not lfs.attributes(p) then return nil, 'no icon for ' .. name end
+	end
+	return p
+end
+
+local function initials(name)
+	local s = ''
+	for part in name:gmatch('[^%-_ ]+') do s = s .. part:sub(1, 1):upper() end
+	return s:sub(1, 3)
+end
+
+-- TeX for the icon of item name at the given width: the game's icon, or a placeholder.
+function M.icon_tex(name, width)
+	local p, why
+	if not (M.icon_opts and M.icon_opts.off) then p, why = M.icon_file(name) else why = 'icons=false' end
+	if p then
+		local im = img and img.scan({ filename = p })
+		local vp = '0 0 64 64'
+		if im and im.xsize and im.xsize > 0 then
+			-- the leftmost square, in the image's own big points
+			local wbp, hbp = im.width / 65536 * 72 / 72.27, im.height / 65536 * 72 / 72.27
+			local side = hbp
+			vp = string.format('0 0 %.4f %.4f', side * math.min(1, wbp / hbp), hbp)
+		end
+		return string.format('\\BeltmapIconImage{%s}{%s}{%s}', vp, width, p)
+	end
+	if why and why ~= 'icons=false' and not icon_warned[why] and texio then
+		icon_warned[why] = true
+		texio.write_nl('term and log', 'beltmap warning: ' .. why .. '; drawing a placeholder')
+	end
+	return string.format('\\BeltmapIconMissing{%s}{%s}', width, initials(name))
+end
+
+-- \beltmapicon[width]{name}
+function M.icon(name, width)
+	M.icon_opts = { data = topt('factoriodata'), off = (topt('icons') == 'false') }
+	tex.sprint(M.icon_tex(name, width ~= '' and width or '1.2em'))
 end
 
 M.TIERS, M.DIRS, M.GLYPHS = TIERS, DIRS, GLYPHS

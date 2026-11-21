@@ -25,7 +25,7 @@
 %   \usetikzlibrary{beltmap}        the glyphs by hand, in any tikzpicture
 % Reading, tracing and the TikZ code are done in beltmap.lua.  See beltmap-doc.pdf.
 \NeedsTeXFormat{LaTeX2e}[2024-06-01]
-\ProvidesExplPackage{beltmap}{2026-11-21}{0.2}{Schematic pictures of Factorio belt layouts}
+\ProvidesExplPackage{beltmap}{2026-11-21}{0.3}{Schematic pictures of Factorio belt layouts}
 
 \sys_if_engine_luatex:F
 	{
@@ -36,9 +36,15 @@
 % The libraries are read with ordinary catcodes: under expl3 syntax their spaces vanish.
 \ExplSyntaxOff
 \RequirePackage{tikz}
+\RequirePackage{graphicx}
 \usetikzlibrary{beltmap}
+% Game icons: the leftmost square of the icon file, clipped; or a placeholder with initials.
+\def\BeltmapIconImage#1#2#3{\raisebox{-0.22\height}{\includegraphics[viewport=#1, clip, width=#2]{#3}}}
+\def\BeltmapIconMissing#1#2{\tikz[baseline=-0.6ex]\node[bm icon missing, minimum width=#1, minimum height=#1]{#2};}
 \ExplSyntaxOn
 \lua_now:n { beltmap = require('beltmap') }
+\tl_new:N \l__beltmap_factoriodata_tl
+\tl_new:N \l__beltmap_icons_tl
 
 \tl_new:N \l__beltmap_tier_tl
 \tl_new:N \l__beltmap_trim_tl
@@ -125,6 +131,9 @@
 		palette .choices:nn = { wheel , okabe-ito , lightness , gray } { \tl_set_eq:NN \l__beltmap_palette_tl \l_keys_choice_tl } ,
 		compare .tl_set:N = \l__beltmap_compare_tl ,
 		view .choices:nn = { graph , wires } { \tl_set_eq:NN \l__beltmap_view_tl \l_keys_choice_tl } ,
+		factorio~data .tl_set:N = \l__beltmap_factoriodata_tl ,
+		icons .choices:nn = { true , false } { \tl_set_eq:NN \l__beltmap_icons_tl \l_keys_choice_tl } ,
+		icons .default:n = true ,
 		view / layout .code:n = { \tl_clear:N \l__beltmap_view_tl } ,
 		expect .tl_set:N = \l__beltmap_expect_tl ,
 		columns .int_set:N = \l__beltmap_columns_int ,
@@ -304,6 +313,10 @@
 		\group_end:
 	}
 	{ }
+
+% \beltmapicon[width]{item}: a game icon in running text, from the reader's copy of Factorio.
+\NewDocumentCommand \beltmapicon { O{1.2em} m }
+	{ \lua_now:e { beltmap.icon('\lua_escape:e {#2}', '\lua_escape:e { \exp_not:n {#1} }') } }
 
 \NewDocumentCommand \beltglyph { O{} m }
 	{

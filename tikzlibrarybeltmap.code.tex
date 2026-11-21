@@ -58,7 +58,7 @@
 
 % ---------------------------------------------------------------------- glyph options
 \def\bm@reset{%
-	\def\bm@number{}\def\bm@dir{0}\def\bm@in{}\def\bm@out{}\def\bm@filter{}\def\bm@trim{}\def\bm@fcolor{bmf0}%
+	\def\bm@number{}\def\bm@dir{0}\def\bm@in{}\def\bm@out{}\def\bm@filter{}\def\bm@trim{}\def\bm@fcolor{bmf0}\def\bm@ficon{}%
 }
 \def\bm@side#1{\ifx#1\bm@left 0.5\else -0.5\fi}
 \def\bm@left{left}
@@ -74,6 +74,7 @@
 	out/.store in=\bm@out,
 	filter/.code={\def\bm@filter{#1}},
 	filter color/.store in=\bm@fcolor,
+	filter icon/.store in=\bm@ficon,
 	trim/.store in=\bm@trim,
 	number/.store in=\bm@number,
 }
@@ -127,6 +128,10 @@
 				% The filtered item leaves on the output-priority side, left when none is set.
 				\ifx\bm@out\pgfutil@empty\def\bm@out{left}\fi
 				\edef\bm@s{\bm@side\bm@out}\path[bm filter=\bm@fcolor] (0.135,{\bm@s+0.17}) -- (0.305,\bm@s) -- (0.135,{\bm@s-0.17}) -- (-0.035,\bm@s) -- cycle;
+				% filter icon={...}: the item's icon over the diamond, upright, on a light plate.
+				\ifx\bm@ficon\pgfutil@empty\else
+					\node[bm filter icon] at (0.135,\bm@s) {\bm@ficon};
+				\fi
 			\fi
 		\end{scope}
 	},
@@ -184,6 +189,10 @@
 	bm g arc/.style={draw=#1, line width=0.17\bmunit, -{Stealth[length=0pt 3.6, width=0pt 3.2]}, shorten >=0.05\bmunit,
 		preaction={draw=bm-gbg, line width=0.42\bmunit, -}},
 	bm gcolors/.code n args={4}{\colorlet{bm-gfill}{#1}\colorlet{bm-gtext}{#2}\colorlet{bm-gink}{#3}\colorlet{bm-gbg}{#4}},
+	% Game icons (from the reader's own copy of the game) and their placeholder.
+	bm filter icon/.style={fill=white, fill opacity=0.85, text opacity=1, rounded corners=0.08\bmunit, inner sep=0.03\bmunit},
+	bm icon missing/.style={draw=black!45, fill=black!6, rounded corners=0.15em, inner sep=0pt, text=black!60,
+		font=\sffamily\bfseries\fontsize{4.5}{5}\selectfont},
 	% view=wires: wires in the belt's color, splitters as a bar between two pads, in the
 	% colors of the graph.
 	bm w wire/.style={draw=#1, line width=0.3\bmunit, line cap=round},
