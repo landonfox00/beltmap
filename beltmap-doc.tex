@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.1                                                        2026-11-19
+% beltmap 0.1.1                                                      2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -44,7 +44,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.1, 2026-11-19\par}
+		{\large version 0.1.1, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -317,7 +317,9 @@
 
 	With \key{mix}, each input carries an item of its own color, and every belt is colored by what it carries. The flow is computed exactly from the trace. Each input feeds one unit; a splitter sends half of what enters it out of each side, all of it to its output-priority side, or all of it to its one side that leads anywhere; a side-load adds to the belt it joins; a belt that leads nowhere carries nothing. A loop fed only through output-priority sides takes items in and lets none out; in the game it fills, and its splitter then sends everything to the other side. beltmap finds such loops, as sets of belts that no flow leaves, and counts them full. A layout is \emph{balanced} when each of its $m$ outputs carries $1/m$ of every input, and then all its outputs look alike. \cs{beltmapverdict} holds the verdict on the last picture, the alternative text includes it, and the log lists what each output carries.
 
-	\key{mix=blend} paints each belt with the average of its input colors, taken in the OKLab color space. The input colors lie evenly round a circle of hues, so the even blend of all of them is gray: a balancer ends in gray belts, and a tinted output names the inputs it carries too much of. Two different mixes can blend to nearly the same color, so a blend illustrates and \key{mix=bands} checks. Bands draw each belt as stripes, a pair per input, each pair as wide as that input's share of the belt; the outputs of a balancer carry the same stripes in the same widths.
+	\key{mix=blend} paints each belt with the average of its input colors, each weighted by that input's share of the belt and taken in the OKLab color space. The input colors lie evenly round a circle of hues, so the even blend of all of them is gray, and a balancer ends in gray belts. The converse is false: gray outputs do not make a balancer. A color has three coordinates, lightness and two of hue, and a blend presses the $n$ shares of a belt into these three, so from $5$ inputs up many uneven mixes blend to exactly the gray of the even one. With $5$ inputs, a belt that carries $12.2\%$, $15.5\%$, $35.2\%$, $0\%$, and $37.2\%$ of inputs $1$ to $5$ is that gray. Up to $4$ inputs different mixes blend to different colors, but close mixes give colors the eye cannot tell apart. A tinted output does carry an uneven mix; which inputs it carries too much of is read from the bands or from \cs{beltmapmatrix}.
+
+	\key{mix=bands} draws each belt as stripes, a pair per input, each pair as wide as that input's share of the belt. Bands tell any two mixes apart, but they show shares, not amounts: a belt that carries half a unit and one that carries two units in the same proportions get the same stripes. The outputs of a balancer carry the same stripes in the same widths, and so do the outputs of a layout that sends the same mix to its outputs in unequal amounts, as in the last picture below. Neither view decides balance. The verdict does: \cs{beltmapverdict} is computed from the amounts each output carries, and \key{expect=balanced} stops the document when the layout is not balanced (section~\ref{sec:exact}).
 
 	\begin{center}
 		\begin{tabular}{@{}c@{\qquad}c@{}}
@@ -343,6 +345,14 @@
 			\\
 			\multicolumn{2}{@{}c@{}}{\small\beltmapverdict}
 		\end{tabular}
+
+		\bigskip
+		\begin{beltgrid}[mix=bands, labels, tile=5mm, expect=unbalanced]
+			> S> > > > \\
+			> S> > S> > \\
+			. . . S> >
+		\end{beltgrid}\par\smallskip
+		\parbox{0.8\linewidth}{\centering\small The same stripes on every output, but output 1 carries twice as much as each of the others.\\ \beltmapverdict}
 	\end{center}
 
 	\section{Exact shares, claims, and captions}

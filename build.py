@@ -77,7 +77,7 @@ def main():
 		raise SystemExit('beltmap-doc.tex does not carry version %s, %s' % (version, date))
 
 	shutil.rmtree(BUILD, ignore_errors=True)
-	os.makedirs(STAGE)
+	os.makedirs(STAGE, exist_ok=True)  # an empty folder that some process still has open survives rmtree
 	for name in SHIP:
 		src = os.path.join(HERE, name)
 		(shutil.copytree if os.path.isdir(src) else shutil.copy2)(src, os.path.join(STAGE, name))
