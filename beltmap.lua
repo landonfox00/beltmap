@@ -981,6 +981,32 @@ function M.throughput(state)
 	return state.tp
 end
 
+-- blocked: balance with outputs blocked (beltmap-net.lua's N.blocked), as a verdict.
+function M.blocked(state)
+	if state.blk ~= nil then return state.blk end
+	state.blk = false
+	local r, why = NET.blocked(state.tr)
+	if not r then
+		state.blk = { verdict = 'no blocked-output test: ' .. why }
+		return state.blk
+	end
+	local text
+	if r.fails == 0 then
+		text = string.format('stays balanced with any outputs blocked: every open output carries an even share of every input (%d choices, at light load)', r.tested)
+	else
+		local w = r.worst
+		local which = string.format('output%s %s', #w.B == 1 and '' or 's', table.concat(w.B, ', '))
+		if w.none then
+			text = string.format('with %s blocked the flow has no steady state', which)
+		else
+			text = string.format('not balanced with %s blocked: output %d carries %s of input %d, not %s', which, w.o, pct(w.v), w.i, pct(w.target))
+		end
+		text = text .. string.format(' (%d of %d choices fail, at light load)', r.fails, r.tested)
+	end
+	state.blk = { verdict = text, ok = (r.fails == 0), tested = r.tested, fails = r.fails }
+	return state.blk
+end
+
 -- The colors of a mixed picture.  opts.mix: blend or bands; opts.focus: an input number;
 -- opts.step: a frame of the animation; opts.palette.  Returns the table M.tikz reads, or nil
 -- and the reason.
@@ -1161,6 +1187,7 @@ function M.prepare(L, opts)
 		M.balance(state)
 	end
 	if opts.throughput then M.throughput(state) end
+	if opts.blocked then M.blocked(state) end
 	if opts.compare then state.diff = M.diff(L, M.rotate(M.layout_from_file(opts.compare, {}), turns)) end
 	return state
 end
@@ -1833,6 +1860,7 @@ function M.describe(state)
 		if state.opts.lanemix then parts[#parts + 1] = 'Each lane is colored on its own; ' .. plain(state.bal.lane_verdict) end
 	end
 	if state.tp then parts[#parts + 1] = 'Throughput: ' .. plain(state.tp.verdict) end
+	if state.blk then parts[#parts + 1] = 'With outputs blocked: ' .. plain(state.blk.verdict) end
 	if state.diff then
 		parts[#parts + 1] = string.format('Compared with another layout: %d tiles added, %d removed, %d changed', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -1855,6 +1883,7 @@ function M.caption(state)
 	if state.bal and state.bal.balanced ~= nil then parts[#parts + 1] = state.bal.balanced and 'balanced' or 'not balanced' end
 	if state.opts.lanemix and state.bal and state.bal.lanes ~= nil then parts[#parts + 1] = state.bal.lanes and 'lanes kept' or 'lanes not kept' end
 	if state.tp then parts[#parts + 1] = state.tp.ok and 'passes max-flow' or 'throughput limited' end
+	if state.blk and state.blk.ok ~= nil then parts[#parts + 1] = state.blk.ok and 'balanced when blocked' or 'unbalanced when blocked' end
 	if state.diff then
 		parts[#parts + 1] = string.format('+%d $-$%d $\\sim$%d tiles', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -1994,6 +2023,7 @@ local function tex_options(L)
 	o.step = tonumber(topt('step') or '')
 	o.palette = topt('palette')
 	o.throughput = bool('throughput')
+	o.blocked = bool('blocked')
 	o.numbers = bool('numbers')
 	o.compare = topt('compare')
 	o.view = topt('view')
@@ -2033,7 +2063,7 @@ end
 
 local function plain(s) return (s:gsub('\\%%', '%%'):gsub('%$', '')) end
 
--- expect={balanced, unbalanced, lanes, throughput, limited}: stop with an error when the layout
+-- expect={balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced}: stop with an error when the layout
 -- is not what the document says it is.
 local function check_expect(state, list)
 	for _, e in ipairs(list) do
@@ -2049,6 +2079,13 @@ local function check_expect(state, list)
 			else
 				ok, why = b.lanes, b.lane_verdict
 			end
+		elseif e == 'blocked' or e == 'blocked-unbalanced' then
+			local b = M.blocked(state)
+			if b.ok == nil then
+				ok, why = false, b.verdict
+			else
+				ok, why = (e == 'blocked') == b.ok, b.verdict
+			end
 		elseif e == 'throughput' or e == 'limited' then
 			local t = M.throughput(state)
 			if not t then
@@ -2057,7 +2094,7 @@ local function check_expect(state, list)
 				ok, why = (e == 'throughput') == t.ok, t.verdict
 			end
 		else
-			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited)'
+			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced)'
 		end
 		if not ok then tex.error('beltmap: expect=' .. e .. ' fails: ' .. plain(why)) end
 	end
@@ -2137,6 +2174,7 @@ local function finish(getL, alt_override)
 	token.set_macro('beltmapverdict', verdict, 'global')
 	token.set_macro('beltmaplanes', current and current.bal and current.bal.lane_verdict or '', 'global')
 	token.set_macro('beltmapthroughput', current and current.tp and current.tp.verdict or '', 'global')
+	token.set_macro('beltmapblocked', current and current.blk and current.blk.verdict or '', 'global')
 	local okc, cap = pcall(function() return current and M.caption(current) or '' end)
 	token.set_macro('beltmapcaption', okc and cap or '', 'global')
 end
