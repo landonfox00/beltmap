@@ -923,6 +923,66 @@ function N.layout(g, opts)
 	return pos, { back = back, col = col }
 end
 
+-- ------------------------------------------------------------------ blocked outputs
+
+-- Balance with outputs blocked.  A blocked output backs up: its belt is full, so the splitter
+-- feeding it sends everything to its other side, and a belt that now leads only into full belts
+-- is full too (the same rule settle() uses for loops that fill).  For every nonempty proper set B
+-- of outputs, those outputs are blocked and the shares solved again; the layout passes when
+-- every open output carries 1/|open| of every input.  Blocking inputs needs no test: without
+-- belt capacity the flow of each input is independent of the others.  Up to 10 outputs (1022
+-- choices).  Returns { tested, fails, worst = { B, o, i, v, target } } or nil and a reason.
+local BLOCKED_MAX = 10
+
+function N.blocked(tr)
+	local base = N.build(tr)
+	local m, n = base.m, base.n
+	if m < 2 or n < 1 then return nil, 'it needs at least one input and two outputs' end
+	if m > BLOCKED_MAX then return nil, 'it has more than ' .. BLOCKED_MAX .. ' outputs' end
+	local tested, fails, worst = 0, 0, nil
+	for mask = 1, (1 << m) - 2 do
+		local net = N.build(tr)
+		local B, open = {}, {}
+		for o, out in ipairs(net.outputs) do
+			if mask & (1 << (o - 1)) ~= 0 then
+				B[#B + 1] = o
+				net.blocked[out.k] = true
+			else
+				open[#open + 1] = out
+			end
+		end
+		net.live = compute_live(tr, net.where, net.blocked)
+		tested = tested + 1
+		local x = N.shares(net)
+		local exact = net.exact
+		local target = exact and q(1, #open) or 1 / #open
+		local bad
+		if not x then
+			bad = { dev = math.huge, none = true }
+		else
+			for _, out in ipairs(open) do
+				local per = N.belt(net, net.last[out.k])
+				for i = 1, n do
+					local same = (exact and is_q(per[i])) and (per[i] == target) or math.abs(float(per[i]) - float(target)) < 1e-9
+					if not same then
+						local dev = math.abs(float(per[i]) - float(target))
+						if not bad or dev > bad.dev then bad = { dev = dev, o = out.index, i = i, v = per[i] } end
+					end
+				end
+			end
+		end
+		if bad then
+			fails = fails + 1
+			-- the worst case to show: fewest blocked outputs first, then the largest deviation
+			if not worst or #B < #worst.B or (#B == #worst.B and bad.dev > worst.dev) then
+				bad.B, bad.target = B, target
+				worst = bad
+			end
+		end
+	end
+	return { tested = tested, fails = fails, worst = worst }
+end
+
 -- ------------------------------------------------------------------ the wire diagram
 
 -- view=wires: the network as a balancing-network diagram (Aspnes, Herlihy and Shavit), drawn

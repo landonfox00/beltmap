@@ -25,7 +25,7 @@
 %   \usetikzlibrary{beltmap}        the glyphs by hand, in any tikzpicture
 % Reading, tracing and the TikZ code are done in beltmap.lua.  See beltmap-doc.pdf.
 \NeedsTeXFormat{LaTeX2e}[2024-06-01]
-\ProvidesExplPackage{beltmap}{2026-11-21}{0.3}{Schematic pictures of Factorio belt layouts}
+\ProvidesExplPackage{beltmap}{2026-11-21}{0.4}{Schematic pictures of Factorio belt layouts}
 
 \sys_if_engine_luatex:F
 	{
@@ -71,6 +71,7 @@
 \tl_new:N \l__beltmap_step_tl
 \tl_new:N \l__beltmap_palette_tl
 \tl_new:N \l__beltmap_throughput_tl
+\tl_new:N \l__beltmap_blocked_tl
 \tl_new:N \l__beltmap_numbers_tl
 \tl_new:N \l__beltmap_compare_tl
 \tl_new:N \l__beltmap_view_tl
@@ -84,6 +85,7 @@
 \int_new:N \l__beltmap_columns_int
 \tl_new:N \beltmaplanes
 \tl_new:N \beltmapthroughput
+\tl_new:N \beltmapblocked
 \tl_new:N \beltmapcaption
 
 % A key taking true or false, stored as text for beltmap.lua to read.
@@ -95,7 +97,7 @@
 				#1 .default:n = true ,
 			}
 	}
-\clist_map_function:nN { ends , heads , lanes , labels , openends , throughput , numbers , dimensions } \__beltmap_bool_key:n
+\clist_map_function:nN { ends , heads , lanes , labels , openends , throughput , blocked , numbers , dimensions } \__beltmap_bool_key:n
 % grid: true (normal), false (none), faint, or strong; grid major=n, rulers=n, dimensions.
 \keys_define:nn { beltmap }
 	{

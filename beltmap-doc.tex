@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.3                                                        2026-11-21
+% beltmap 0.4                                                        2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -47,7 +47,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.3, 2026-11-21\par}
+		{\large version 0.4, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -232,8 +232,9 @@
 		\key{mix lanes} & \key{false} & color the two lanes of each belt on their own (section~\ref{sec:lanes}) \\
 		\key{focus} & & an input number: shade each belt by how much of that input it carries \\
 		\key{palette} & \key{wheel} & \key{wheel}, \key{okabe-ito}, \key{lightness}, or \key{gray} (the default in \key{print}) \\
-		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}: stop when the layout is not so (section~\ref{sec:exact}) \\
+		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}, \key{blocked}, \key{blocked-unbalanced}: stop when the layout is not so (section~\ref{sec:exact}) \\
 		\key{throughput} & \key{false} & run the max-flow test and mark the cut (section~\ref{sec:tp}) \\
+		\key{blocked} & \key{false} & test the balance with every set of outputs blocked (section~\ref{sec:blocked}) \\
 		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}); \key{wires}: the wire diagram (section~\ref{sec:wires}) \\
 		\key{icons} & \key{true} & game icons from your copy of Factorio, or placeholders with \key{false} (section~\ref{sec:icons}) \\
 		\key{factorio data} & found & the game's \texttt{data} folder \\
@@ -377,7 +378,7 @@
 	\section{Throughput}
 	\label{sec:tp}
 
-	A balancer can balance and still not pass full belts: a belt that every input must cross caps them all. \key{throughput} runs the max-flow test. Every lane is given a capacity of one, every choice of open inputs $I$ and outputs $O$ is tried, and a choice is \emph{limited} when less than $\min(|I|, |O|)$ belts can get through. A limited choice is proved limited: the test finds a \emph{cut}, a set of lanes whose removal separates $I$ from $O$, with less capacity than the choice needs. The picture shows the cut of the worst choice glowing under its belts, and \cs{beltmapthroughput} holds the verdict. Passing the test is necessary for a throughput-unlimited balancer, not sufficient: a splitter does not route along a maximum flow, and the steady states that decide it (\texttt{design-methods/tu.py} of this project) need a mixed-integer program that LuaTeX does not have. Up to 4096 choices are tried; beyond that, only the choices with as many outputs as inputs.
+	A balancer can balance and still not pass full belts: a belt that every input must cross caps them all. \key{throughput} runs the max-flow test. Every lane is given a capacity of one, every choice of open inputs $I$ and outputs $O$ is tried, and a choice is \emph{limited} when less than $\min(|I|, |O|)$ belts can get through. A limited choice is proved limited: the test finds a \emph{cut}, a set of lanes whose removal separates $I$ from $O$, with less capacity than the choice needs. The picture shows the cut of the worst choice glowing under its belts, and \cs{beltmapthroughput} holds the verdict. Passing the test is necessary for a throughput-unlimited balancer, not sufficient: a splitter does not route along a maximum flow, and the steady states that decide it need a mixed-integer program that LuaTeX does not have. Up to 4096 choices are tried; beyond that, only the choices with as many outputs as inputs.
 
 	\begin{center}
 		\begin{beltgrid}[mix, throughput, labels, tile=6mm, expect={balanced, limited}]
@@ -385,6 +386,25 @@
 			> S> . S> >
 		\end{beltgrid}\par\smallskip
 		\small balanced, but \beltmapthroughput
+	\end{center}
+
+	\section{Blocked outputs}
+	\label{sec:blocked}
+
+	A balancer can balance with every output open and stop balancing when one backs up. A blocked output's belt is full, so the splitter that feeds it sends everything to its other side, and a belt that leads only into full belts fills too. \key{blocked} tries every nonempty set of outputs short of all of them: it blocks those outputs, computes the shares again, and checks that every open output carries an even share, one over the number of open outputs, of every input. \cs{beltmapblocked} holds the verdict and names the worst choice, with as few outputs blocked as possible; \key{expect=blocked} and \key{expect=blocked-unbalanced} turn it into a check. Blocked inputs need no test: without belt capacity each input's flow does not depend on the others. Up to $10$ outputs ($1022$ choices) are tested.
+
+	The model has no belt capacity, so the verdict holds at light load, when nothing inside the layout fills up on its own. At full load a belt that cannot take more backs up into the splitters before it and shifts the flow, which this test does not follow.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[mix=bands, blocked, labels, tile=3.4mm, expect={balanced, blocked-unbalanced}]{examples/f00_9x10.json}\global\let\beltmapblockedA\beltmapblocked &
+			\begin{beltgrid}[mix=bands, blocked, labels, tile=6mm, expect=blocked]
+				> S> > \\
+				> S> >
+			\end{beltgrid} \\[4pt]
+			\parbox[t]{0.46\linewidth}{\centering\small f00, a balancer: \beltmapblockedA} &
+			\parbox[t]{0.36\linewidth}{\centering\small one splitter: \beltmapblocked}
+		\end{tabular}
 	\end{center}
 
 	\section{Lanes, focus, and palettes}
@@ -520,5 +540,6 @@ python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.g
 		\item Labels of a layout that runs up or down overlap when longer than a tile is wide.
 		\item In \key{transit}, belts carry no arrowheads; direction shows on splitters and portals only.
 		\item \key{mix} has no belt capacity: it judges whether a layout balances, and \key{throughput} only runs the max-flow test, which is necessary for full throughput but not sufficient. Filters are ignored: every item is the same item.
+		\item \key{blocked} judges balance at light load only; at full load backed-up belts shift the flow in ways the model does not follow. A layout with lane balancers, which even out the two lanes of a belt, gets no verdict of its own on that.
 	\end{itemize}
 \end{document}
