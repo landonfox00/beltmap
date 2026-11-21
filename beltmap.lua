@@ -886,6 +886,12 @@ end
 -- The network of the trace and what is computed on it live in beltmap-net.lua; here the
 -- results become colors and sentences.
 
+-- Exact equality of shares (rationals when exact, else within 1e-9).
+local function same(a, b)
+	if type(a) == 'table' and type(b) == 'table' then return a == b end
+	return math.abs(NET.float(a) - NET.float(b)) < 1e-9
+end
+
 local function pct(v)
 	return (string.format('%.1f', 100 * NET.float(v)):gsub('%.0$', '')) .. '\\%'
 end
@@ -981,6 +987,50 @@ function M.throughput(state)
 	return state.tp
 end
 
+-- Input balance (beltmap-net.lua's N.input_balance), as a verdict: at full backpressure, each
+-- input supplies 1/n of every output's demand.
+function M.input_balance(state)
+	if state.ibal ~= nil then return state.ibal end
+	state.ibal = false
+	local net = M.network(state)
+	if not net or net.n == 0 or net.m == 0 then return false end
+	local r = NET.input_balance(net)
+	if not r then
+		state.ibal = { verdict = 'no input-balance verdict: the demand has no steady state' }
+		return state.ibal
+	end
+	local text
+	if r.balanced then
+		text = string.format('input balanced: each of the %d inputs supplies %s of every output\'s demand (at full backpressure)', net.n, pct(1 / net.n))
+	else
+		local w = r.worst
+		text = string.format('not input balanced: input %d supplies %s of output %d\'s demand, not %s (at full backpressure)', w.i, pct(w.v), w.o, pct(w.target))
+	end
+	state.ibal = { verdict = text, balanced = r.balanced, per_input = r.per_input }
+	return state.ibal
+end
+
+-- marks: a check or a cross on every input (input balance) and output (balance of that output:
+-- it carries 1/m of every input).
+function M.marks(state)
+	if state.marks ~= nil then return state.marks end
+	state.marks = false
+	local net = M.network(state)
+	if not net or net.n == 0 or net.m == 0 or not NET.shares(net) then return false end
+	local outs = {}
+	for _, out in ipairs(net.outputs) do
+		local per = NET.belt(net, net.last[out.k])
+		local ok = true
+		for i = 1, net.n do
+			if not same(per[i], net.exact and NET.q(1, net.m) or 1 / net.m) then ok = false end
+		end
+		outs[out.index] = ok
+	end
+	local ib = M.input_balance(state)
+	state.marks = { outs = outs, ins = ib and ib.per_input or {} }
+	return state.marks
+end
+
 -- blocked: balance with outputs blocked (beltmap-net.lua's N.blocked), as a verdict.
 function M.blocked(state)
 	if state.blk ~= nil then return state.blk end
@@ -1005,6 +1055,62 @@ function M.blocked(state)
 	end
 	state.blk = { verdict = text, ok = (r.fails == 0), tested = r.tested, fails = r.fails }
 	return state.blk
+end
+
+-- mix=strict and mix=check: colors that are gray exactly when a belt is balanced.
+--   vals   what the belt carries of each of k kinds (floats); labs: the k colors in OKLab
+--   target the share each kind should have, as an amount (outputs, input belts of the demand
+--          view), or nil for an even mix whatever the amount (every other belt)
+--   even   whether the belt is balanced, decided exactly by the caller
+-- strict: the blend of the kinds, as mix=blend, except that a belt that is not balanced stays at
+-- least STRICT_GAP from the balanced gray (pushed along its own tint, or toward the kind it has
+-- most of when its tint is nil), and a target belt is lighter when it carries too much and
+-- darker when too little.  check: gray, or the color of the kind most in excess at a strength
+-- that grows with log2 of the largest error from a floor, or slate when short of every kind.
+local STRICT_GAP, CHECK_FLOOR, SLATE = 0.045, 0.45, { 0.40, -0.005, -0.045 }
+local function shade(mode, vals, labs, target, even)
+	local k = #vals
+	local tot = 0
+	for i = 1, k do tot = tot + vals[i] end
+	local G = { 0, 0, 0 }
+	for i = 1, k do for c = 1, 3 do G[c] = G[c] + labs[i][c] / k end end
+	if even then return oklab(G[1], G[2], G[3]) end
+	local err, best, beste = {}, 1, -math.huge
+	for i = 1, k do
+		err[i] = target and (vals[i] - target) or (vals[i] / tot - 1 / k)
+		if err[i] > beste then best, beste = i, err[i] end
+	end
+	if mode == 'check' then
+		if beste <= 1e-12 then return oklab(SLATE[1], SLATE[2], SLATE[3]) end
+		local d = 0
+		for i = 1, k do d = math.max(d, math.abs(err[i])) end
+		local t = math.max(0, math.min(1, (math.log(math.max(d, 1e-300), 2) + 10) / 9))
+		local s = CHECK_FLOOR + (1 - CHECK_FLOOR) * t
+		local c = labs[best]
+		return oklab(G[1] + s * (c[1] - G[1]), G[2] + s * (c[2] - G[2]), G[3] + s * (c[3] - G[3]))
+	end
+	-- strict
+	local p = { -G[1], -G[2], -G[3] }
+	for i = 1, k do for c = 1, 3 do p[c] = p[c] + vals[i] / tot * labs[i][c] end end
+	local mixed_even = true
+	for i = 1, k do if math.abs(vals[i] / tot - 1 / k) > 1e-12 then mixed_even = false end end
+	if not mixed_even then
+		local norm = math.sqrt(p[1] ^ 2 + p[2] ^ 2 + p[3] ^ 2)
+		if norm < STRICT_GAP then
+			local d = (norm > 1e-9) and p or { labs[best][1] - G[1], labs[best][2] - G[2], labs[best][3] - G[3] }
+			local dn = math.sqrt(d[1] ^ 2 + d[2] ^ 2 + d[3] ^ 2)
+			if dn > 0 then for c = 1, 3 do p[c] = d[c] * STRICT_GAP / dn end end
+		end
+	end
+	if target then
+		local want = target * k
+		if math.abs(tot - want) > 1e-12 then
+			local dL = math.max(-0.25, math.min(0.25, 0.15 * math.log(tot / want, 2)))
+			if math.abs(dL) < STRICT_GAP then dL = (tot > want) and STRICT_GAP or -STRICT_GAP end
+			p[1] = p[1] + dL
+		end
+	end
+	return oklab(G[1] + p[1], G[2] + p[2], G[3] + p[3])
 end
 
 -- The colors of a mixed picture.  opts.mix: blend or bands; opts.focus: an input number;
@@ -1076,6 +1182,84 @@ function M.mixing(state)
 		end
 		mix.total = mix.total or {}
 		mix.total[p] = tot
+	end
+	local mode = (opts.mix == 'strict' or opts.mix == 'check') and opts.mix or nil
+	-- mix=strict, mix=check: each belt gray exactly when balanced.  An output is balanced when it
+	-- carries 1/m of every input (amounts); any other belt when it carries every input alike.
+	-- Exact on the steady state; within 1e-9 on an animation frame.
+	if mode and not mix.focus and not opts.demand then
+		local outpiece = {}
+		for _, out in ipairs(net.outputs) do outpiece[net.last[out.k]] = out.index end
+		local m = net.m
+		for p = 1, #net.pieces do
+			if mix.total[p] and mix.total[p] > 1e-9 then
+				local per
+				if opts.step then
+					per = {}
+					for i = 1, n do per[i] = (NET.float(x[p][1][2 * i - 1]) + NET.float(x[p][1][2 * i]) + NET.float(x[p][2][2 * i - 1]) + NET.float(x[p][2][2 * i])) / 2 end
+				else
+					per = NET.belt(net, p)
+				end
+				local even = true
+				local target = outpiece[p] and (1 / m) or nil
+				for i = 1, n do
+					if outpiece[p] then
+						if not same(per[i], net.exact and not opts.step and NET.q(1, m) or 1 / m) then even = false end
+					elseif not same(per[i], per[1]) then
+						even = false
+					end
+				end
+				local vals = {}
+				for i = 1, n do vals[i] = NET.float(per[i]) end
+				mix.rgb[p], mix.expr[p] = shade(mode, vals, labs, target, even), 'bmp' .. (p - 1)
+			end
+		end
+	end
+	-- demand: color each belt by the outputs whose demand passes through it (beltmap-net.lua's
+	-- N.demand), with blend, strict or check.  Input belts are judged by amount: balanced when
+	-- they supply 1/n of every output's demand.
+	if opts.demand and not mix.focus then
+		if opts.mix == 'bands' then return nil, 'demand works with mix=blend, strict or check, not bands' end
+		local D = NET.demand(net)
+		if not D then return nil, 'the demand has no steady state' end
+		local m = net.m
+		local olabs = input_labs(m, palette)
+		mix.outputs = {}
+		for o = 1, m do mix.outputs[o] = oklab(olabs[o][1], olabs[o][2], olabs[o][3]) end
+		for p = 1, #net.pieces do mix.rgb[p], mix.expr[p] = nil, 'bm-idle' end
+		for idx, a in ipairs(D.g.arcs) do
+			local p = a[3]
+			if p then
+				local v = D.arc[idx]
+				local vals, tot = {}, 0
+				for o = 1, m do vals[o] = NET.float(v[o]); tot = tot + vals[o] end
+				if tot > 1e-9 then
+					local isin = a[1]:sub(1, 2) == 'in'
+					local even = true
+					for o = 1, m do
+						if isin then
+							if not same(v[o], D.exact and NET.q(1, n) or 1 / n) then even = false end
+						elseif not same(v[o], v[1]) then
+							even = false
+						end
+					end
+					local rgb
+					if mode then
+						rgb = shade(mode, vals, olabs, isin and (1 / n) or nil, even)
+					else
+						local L, A, B = 0, 0, 0
+						for o = 1, m do
+							L, A, B = L + vals[o] / tot * olabs[o][1], A + vals[o] / tot * olabs[o][2], B + vals[o] / tot * olabs[o][3]
+						end
+						rgb = oklab(L, A, B)
+					end
+					mix.rgb[p], mix.expr[p] = rgb, 'bmp' .. (p - 1)
+				end
+			end
+		end
+		for p = 1, #net.pieces do
+			for l = 1, 2 do mix.lane[p][l] = { comp = nil, rgb = mix.rgb[p], expr = mix.expr[p] } end
+		end
 	end
 	-- With focus: the share of the input that reaches each output.
 	if mix.focus then
@@ -1175,9 +1359,12 @@ function M.prepare(L, opts)
 	-- The industrial theme always shows the tier; elsewhere only when a tier is given or mixed.
 	if trim == nil or trim == 'auto' then trim = (opts.tier ~= nil) or #tiers_of(L) > 1 or opts.theme == 'industrial' end
 	local state = { L = L, tr = tr, opts = opts, trim = trim }
-	if opts.focus or opts.step then opts.mix = (opts.mix == 'bands') and 'bands' or 'blend' end
+	if opts.focus or opts.step then
+		opts.mix = (opts.mix == 'bands' or opts.mix == 'strict' or opts.mix == 'check') and opts.mix or 'blend'
+	end
+	if opts.demand and not opts.mix then opts.mix = 'blend' end
 	if opts.palette and not PALETTES[opts.palette] then fail('unknown palette ' .. opts.palette) end
-	if opts.mix == 'blend' or opts.mix == 'bands' then
+	if opts.mix == 'blend' or opts.mix == 'bands' or opts.mix == 'strict' or opts.mix == 'check' then
 		local mix, why = M.mixing(state)
 		if mix then
 			state.mix = mix
@@ -1185,7 +1372,9 @@ function M.prepare(L, opts)
 			state.mix_failed = why
 		end
 		M.balance(state)
+		M.input_balance(state)
 	end
+	if opts.marks then M.marks(state) end
 	if opts.throughput then M.throughput(state) end
 	if opts.blocked then M.blocked(state) end
 	if opts.compare then state.diff = M.diff(L, M.rotate(M.layout_from_file(opts.compare, {}), turns)) end
@@ -1592,16 +1781,22 @@ function M.tikz(state)
 		for _, o in ipairs(tr.outputs) do outs[#outs + 1] = add(o[1], flow, -1) end
 		outs = sorted(outs)
 		local ANCHOR = { [0] = 'west', 'south', 'east', 'north' }
-		local function place(names, tiles, away, extra)
+		-- marks: a check or cross just past the belt end, the label beyond it
+		local function place(names, tiles, away, extra, marks)
 			if names == true then
 				names = {}
 				for i = 1, #tiles do names[i] = tostring(i) end
 			end
-			for i, name in ipairs(names or {}) do
-				local c = tiles[i]
-				if c then
+			for i, c in ipairs(tiles) do
+				local off = 0.5
+				if marks and marks[i] ~= nil then
+					w(string.format('\\pic at %s {bm mark=%s};', pt(at(c, away, 0.78)), marks[i] and 'ok' or 'bad'))
+					off = 1.12
+				end
+				local name = names and names[i]
+				if name then
 					if extra and extra[i] then name = name .. '~' .. extra[i] end
-					w(string.format('\\node[bm label, anchor=%s] at %s {%s};', ANCHOR[away], pt(at(c, away, 0.5)), name))
+					w(string.format('\\node[bm label, anchor=%s] at %s {%s};', ANCHOR[away], pt(at(c, away, off)), name))
 				end
 			end
 		end
@@ -1610,8 +1805,9 @@ function M.tikz(state)
 			reach = {}
 			for o, v in pairs(mix.reach) do reach[o] = '{\\scriptsize(' .. pct(v) .. ')}' end
 		end
-		place(opts.inputs or (opts.labels and true or nil), ins, (flow + 2) % 4)
-		place(opts.outputs or ((opts.labels or reach) and true or nil), outs, flow, reach)
+		local mk = opts.marks and state.marks or nil
+		place(opts.inputs or (opts.labels and true or nil), ins, (flow + 2) % 4, nil, mk and mk.ins)
+		place(opts.outputs or ((opts.labels or reach) and true or nil), outs, flow, reach, mk and mk.outs)
 	end
 	return out
 end
@@ -1809,13 +2005,18 @@ function M.wires_tikz(state)
 		w(string.format('\\node[bm w pad] at (%s,%s) {%s};', num(x), num(Y(b[2])), label))
 		w(string.format('\\node[bm w pad] at (%s,%s) {};', num(x), num(Y(b[3]))))
 	end
+	local mk = opts.marks and state.marks or nil
 	for _, a in ipairs(D.arcs) do
 		local y = Y(D.line[a.id])
 		if D.kind[a[1]] == 'input' then
 			w(string.format('\\node[bm g input] at (%s,%s) {%s};', num(0), num(y), opts.labels and a[1]:sub(3) or ''))
+			local ok = mk and mk.ins[tonumber(a[1]:sub(3))]
+			if ok ~= nil then w(string.format('\\pic at (%s,%s) {bm mark=%s};', num(-1.0), num(y), ok and 'ok' or 'bad')) end
 		end
 		if D.kind[a[2]] == 'output' then
 			w(string.format('\\node[bm g output] at (%s,%s) {%s};', num(xR), num(y), opts.labels and a[2]:sub(4) or ''))
+			local ok = mk and mk.outs[tonumber(a[2]:sub(4))]
+			if ok ~= nil then w(string.format('\\pic at (%s,%s) {bm mark=%s};', num(xR + 1.0), num(y), ok and 'ok' or 'bad')) end
 		end
 	end
 	return out
@@ -1861,6 +2062,7 @@ function M.describe(state)
 	end
 	if state.tp then parts[#parts + 1] = 'Throughput: ' .. plain(state.tp.verdict) end
 	if state.blk then parts[#parts + 1] = 'With outputs blocked: ' .. plain(state.blk.verdict) end
+	if state.ibal and state.opts.marks then parts[#parts + 1] = 'Input balance: ' .. plain(state.ibal.verdict) end
 	if state.diff then
 		parts[#parts + 1] = string.format('Compared with another layout: %d tiles added, %d removed, %d changed', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -1884,6 +2086,7 @@ function M.caption(state)
 	if state.opts.lanemix and state.bal and state.bal.lanes ~= nil then parts[#parts + 1] = state.bal.lanes and 'lanes kept' or 'lanes not kept' end
 	if state.tp then parts[#parts + 1] = state.tp.ok and 'passes max-flow' or 'throughput limited' end
 	if state.blk and state.blk.ok ~= nil then parts[#parts + 1] = state.blk.ok and 'balanced when blocked' or 'unbalanced when blocked' end
+	if state.ibal and state.ibal.balanced ~= nil and state.opts.marks then parts[#parts + 1] = state.ibal.balanced and 'input balanced' or 'not input balanced' end
 	if state.diff then
 		parts[#parts + 1] = string.format('+%d $-$%d $\\sim$%d tiles', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -2024,6 +2227,8 @@ local function tex_options(L)
 	o.palette = topt('palette')
 	o.throughput = bool('throughput')
 	o.blocked = bool('blocked')
+	o.marks = bool('marks')
+	o.demand = bool('demand')
 	o.numbers = bool('numbers')
 	o.compare = topt('compare')
 	o.view = topt('view')
@@ -2063,7 +2268,8 @@ end
 
 local function plain(s) return (s:gsub('\\%%', '%%'):gsub('%$', '')) end
 
--- expect={balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced}: stop with an error when the layout
+-- expect={balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced, input-balanced,
+-- input-unbalanced}: stop with an error when the layout
 -- is not what the document says it is.
 local function check_expect(state, list)
 	for _, e in ipairs(list) do
@@ -2078,6 +2284,13 @@ local function check_expect(state, list)
 				ok, why = not b.balanced, b.verdict
 			else
 				ok, why = b.lanes, b.lane_verdict
+			end
+		elseif e == 'input-balanced' or e == 'input-unbalanced' then
+			local b = M.input_balance(state)
+			if not b or b.balanced == nil then
+				ok, why = false, b and b.verdict or 'the demand could not be computed'
+			else
+				ok, why = (e == 'input-balanced') == b.balanced, b.verdict
 			end
 		elseif e == 'blocked' or e == 'blocked-unbalanced' then
 			local b = M.blocked(state)
@@ -2094,7 +2307,7 @@ local function check_expect(state, list)
 				ok, why = (e == 'throughput') == t.ok, t.verdict
 			end
 		else
-			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced)'
+			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced, input-balanced, input-unbalanced)'
 		end
 		if not ok then tex.error('beltmap: expect=' .. e .. ' fails: ' .. plain(why)) end
 	end
@@ -2175,6 +2388,7 @@ local function finish(getL, alt_override)
 	token.set_macro('beltmaplanes', current and current.bal and current.bal.lane_verdict or '', 'global')
 	token.set_macro('beltmapthroughput', current and current.tp and current.tp.verdict or '', 'global')
 	token.set_macro('beltmapblocked', current and current.blk and current.blk.verdict or '', 'global')
+	token.set_macro('beltmapinputs', current and current.ibal and current.ibal.verdict or '', 'global')
 	local okc, cap = pcall(function() return current and M.caption(current) or '' end)
 	token.set_macro('beltmapcaption', okc and cap or '', 'global')
 end

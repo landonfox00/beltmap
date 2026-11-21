@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.4                                                        2026-11-21
+% beltmap 0.5                                                        2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -47,7 +47,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.4, 2026-11-21\par}
+		{\large version 0.5, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -228,11 +228,13 @@
 		\key{tier} & & \key{yellow}, \key{red}, \key{blue}, or \key{turbo} for tiles that name none; turns the trim on \\
 		\key{trim} & \key{auto} & show tier colors on splitters and hoods, yellow for tiles without a tier; \key{auto} shows them when a tier is given or tiers are mixed, and always in \key{industrial} \\
 		\key{color} & \key{belt} & \key{belt}: one color per belt; \key{tier}: the color of its tier \\
-		\key{mix} & \key{none} & \key{blend} (alone, \key{mix} means this) or \key{bands}: color each belt by the inputs it carries, and judge the balance (section~\ref{sec:mix}) \\
+		\key{mix} & \key{none} & \key{blend} (alone, \key{mix} means this) or \key{bands}: color each belt by the inputs it carries, and judge the balance (section~\ref{sec:mix}); \key{strict} or \key{check}: colors that are gray exactly when balanced (section~\ref{sec:check}) \\
+		\key{marks} & \key{false} & a check or a cross on every input (input balance) and output (output balance) \\
+		\key{demand} & \key{false} & color the belts by the demand of the outputs, read backwards, in place of the supply \\
 		\key{mix lanes} & \key{false} & color the two lanes of each belt on their own (section~\ref{sec:lanes}) \\
 		\key{focus} & & an input number: shade each belt by how much of that input it carries \\
 		\key{palette} & \key{wheel} & \key{wheel}, \key{okabe-ito}, \key{lightness}, or \key{gray} (the default in \key{print}) \\
-		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}, \key{blocked}, \key{blocked-unbalanced}: stop when the layout is not so (section~\ref{sec:exact}) \\
+		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}, \key{blocked}, \key{blocked-unbalanced}, \key{input-balanced}, \key{input-unbalanced}: stop when the layout is not so (section~\ref{sec:exact}) \\
 		\key{throughput} & \key{false} & run the max-flow test and mark the cut (section~\ref{sec:tp}) \\
 		\key{blocked} & \key{false} & test the balance with every set of outputs blocked (section~\ref{sec:blocked}) \\
 		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}); \key{wires}: the wire diagram (section~\ref{sec:wires}) \\
@@ -325,7 +327,7 @@
 
 	\key{mix=blend} paints each belt with the average of its input colors, each weighted by that input's share of the belt and taken in the OKLab color space. The input colors lie evenly round a circle of hues, so the even blend of all of them is gray, and a balancer ends in gray belts. The converse is false: gray outputs do not make a balancer. A color has three coordinates, lightness and two of hue, and a blend presses the $n$ shares of a belt into these three, so from $5$ inputs up many uneven mixes blend to exactly the gray of the even one. With $5$ inputs, a belt that carries $12.2\%$, $15.5\%$, $35.2\%$, $0\%$, and $37.2\%$ of inputs $1$ to $5$ is that gray. Up to $4$ inputs different mixes blend to different colors, but close mixes give colors the eye cannot tell apart. A tinted output does carry an uneven mix; which inputs it carries too much of is read from the bands or from \cs{beltmapmatrix}.
 
-	\key{mix=bands} draws each belt as stripes, a pair per input, each pair as wide as that input's share of the belt. Bands tell any two mixes apart, but they show shares, not amounts: a belt that carries half a unit and one that carries two units in the same proportions get the same stripes. The outputs of a balancer carry the same stripes in the same widths, and so do the outputs of a layout that sends the same mix to its outputs in unequal amounts, as in the last picture below. Neither view decides balance. The verdict does: \cs{beltmapverdict} is computed from the amounts each output carries, and \key{expect=balanced} stops the document when the layout is not balanced (section~\ref{sec:exact}).
+	\key{mix=bands} draws each belt as stripes, a pair per input, each pair as wide as that input's share of the belt. Bands tell any two mixes apart, but they show shares, not amounts: a belt that carries half a unit and one that carries two units in the same proportions get the same stripes. The outputs of a balancer carry the same stripes in the same widths, and so do the outputs of a layout that sends the same mix to its outputs in unequal amounts, as in the last picture below. Neither view decides balance. The verdict does: \cs{beltmapverdict} is computed from the amounts each output carries, and \key{expect=balanced} stops the document when the layout is not balanced (section~\ref{sec:exact}). For colors that do decide it, see \key{mix=strict} and \key{mix=check} (section~\ref{sec:check}).
 
 	\begin{center}
 		\begin{tabular}{@{}c@{\qquad}c@{}}
@@ -360,6 +362,61 @@
 		\end{beltgrid}\par\smallskip
 		\parbox{0.8\linewidth}{\centering\small The same stripes on every output, but output 1 carries twice as much as each of the others.\\ \beltmapverdict}
 	\end{center}
+
+	\section{Colors that check balance}
+	\label{sec:check}
+
+	A blend cannot be gray exactly when a layout balances, but a coloring can, because the shares are exact. \key{mix=strict} and \key{mix=check} color every belt from the same shares as \key{mix=blend} and decide, with exact fractions, whether it is balanced. An output is balanced when it carries $1/m$ of every input, so amounts count; any other belt is balanced when it carries every input alike. A balanced belt is the gray of the even blend, and no other belt is.
+
+	\begin{itemize}
+		\item \key{mix=strict} looks like \key{mix=blend}: the inputs' colors run together along the belts. A belt that is not balanced is kept a visible step away from the gray, along its own tint, and an output's lightness shows its amount, lighter when it carries too much and darker when too little. The outputs of a balancer end in gray, and gray outputs now mean a balancer.
+		\item \key{mix=check} is for finding faults. A belt that is not balanced takes the color of the input it carries most in excess, at a strength that grows with the size of the error and never falls below a clearly visible floor, so an error of $1/1024$ shows as plainly as one of $1/4$. An output short of every input is dark slate.
+	\end{itemize}
+
+	\key{marks} puts a check or a cross beside every output and every input. An output passes when it carries $1/m$ of every input; an input passes when it supplies $1/n$ of every output's demand. That second test is \emph{input balance}, and it reads the layout backwards, as at full backpressure: every output asks for one unit, and a backed-up splitter or merge draws what is asked of it evenly from the belts that feed it, or all of it from its input-priority side. \cs{beltmapinputs} holds the verdict, and \key{expect=input-balanced} and \key{expect=input-unbalanced} check it. Input balance and output balance are different properties: the first layout below drains both inputs evenly and still sends output 1 twice as much as each of the others. For a balancer of splitters that each take two belts in and send two out, one implies the other.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\quad}c@{\quad}c@{}}
+			\beltlayout[mix, tile=3.2mm]{examples/f00_9x10.json} &
+			\beltlayout[mix=strict, marks, tile=3.2mm, expect={balanced, input-balanced}]{examples/f00_9x10.json} &
+			\beltlayout[mix=check, marks, tile=3.2mm]{examples/f00_9x10.json} \\
+			\small\key{mix=blend} & \small\key{mix=strict, marks} & \small\key{mix=check, marks}
+		\end{tabular}
+
+		\bigskip
+		\begin{tabular}{@{}c@{\qquad}c@{\qquad}c@{}}
+			\begin{beltgrid}[mix=strict, marks, tile=6.5mm, expect={unbalanced, input-balanced}]
+				> S> > > > \\
+				> S> > S> > \\
+				. . . S> >
+			\end{beltgrid} &
+			\begin{beltgrid}[mix=check, marks, tile=6.5mm, expect={unbalanced, input-unbalanced}]
+				> S> > > > \\
+				> S> > S> > \\
+				> S> > S> > \\
+				> S> > > >
+			\end{beltgrid} &
+			\begin{beltgrid}[mix=strict, marks, tile=6.5mm, expect={balanced, input-unbalanced}]
+				> S>[in=left] > \\
+				> S> >
+			\end{beltgrid} \\[2pt]
+			\parbox[t]{0.27\linewidth}{\centering\small input balanced, outputs not: output 1 is lighter, 2 and 3 darker} &
+			\parbox[t]{0.27\linewidth}{\centering\small neither: outputs 2 and 3 pass, the rest fail} &
+			\parbox[t]{0.27\linewidth}{\centering\small input priority: outputs pass, inputs fail}
+		\end{tabular}
+	\end{center}
+
+	\key{demand} colors the belts by the demand instead of the supply: each output gets a color, and a belt is drawn in the colors of the outputs whose demand passes through it. With \key{mix=strict} or \key{mix=check} it is gray where an output's demand is spread evenly over the inputs. The two readings show the same balancer from each end:
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[mix=strict, marks, tile=3.6mm]{examples/f00_9x10.json} &
+			\beltlayout[mix=strict, marks, demand, tile=3.6mm]{examples/f00_9x10.json} \\
+			\small supply: gray where the inputs are mixed & \small \key{demand}: gray where the outputs' demand is spread
+		\end{tabular}
+	\end{center}
+
+	The colors and marks also work on \key{view=wires}, with the marks beside the circles, and on animations (\key{step}), where they are judged within $10^{-9}$ on each frame. \key{mix lanes} keeps the blend on its lanes, \key{focus} overrides these colorings, and \key{demand} does not combine with \key{mix=bands}.
 
 	\section{Exact shares, claims, and captions}
 	\label{sec:exact}
@@ -541,5 +598,6 @@ python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.g
 		\item In \key{transit}, belts carry no arrowheads; direction shows on splitters and portals only.
 		\item \key{mix} has no belt capacity: it judges whether a layout balances, and \key{throughput} only runs the max-flow test, which is necessary for full throughput but not sufficient. Filters are ignored: every item is the same item.
 		\item \key{blocked} judges balance at light load only; at full load backed-up belts shift the flow in ways the model does not follow. A layout with lane balancers, which even out the two lanes of a belt, gets no verdict of its own on that.
+		\item Input balance is judged at full backpressure, with every backed-up splitter and merge drawing evenly from its feeders unless one side has input priority. In the game a belt that side-loads onto a full belt waits for gaps in it, so the verdict for a layout with side-loads is an approximation.
 	\end{itemize}
 \end{document}

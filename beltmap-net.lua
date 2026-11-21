@@ -923,6 +923,108 @@ function N.layout(g, opts)
 	return pos, { back = back, col = col }
 end
 
+-- ------------------------------------------------------------------ demand
+
+-- Demand: the network read backwards, as at full backpressure.  Every output asks for one unit
+-- of its own kind; a splitter or merge passes what is asked of it to the belts that feed it,
+-- evenly, or all of it to its input-priority side when that side is live (a backed-up splitter
+-- takes from both inputs alike unless one has priority).  Solved exactly, like the shares.
+-- Returns { g, arc = d[idx][o], supply = s[i][o] (what input i supplies of output o's demand),
+-- exact } or nil when the demand has no steady state.
+function N.demand(net)
+	local tr = net.tr
+	local g = N.graph(net)
+	local m = net.m
+	local kind, ins, outs = {}, {}, {}
+	for _, nd in ipairs(g.nodes) do kind[nd.name], ins[nd.name], outs[nd.name] = nd.kind, {}, {} end
+	for idx, a in ipairs(g.arcs) do
+		table.insert(outs[a[1]], idx)
+		table.insert(ins[a[2]], idx)
+	end
+	-- the in-arc of each splitter node that has input priority, when that side is fed
+	local prio = {}
+	for name, k in pairs(kind) do
+		if k == 'splitter' then
+			local sp = tr.splitters[tonumber(name:sub(2))]
+			local t = sp and sp.input and sp.tiles[sp.input == 'right' and 1 or 2]
+			local seg = t and tr.into[t.k]
+			if seg then
+				for _, idx in ipairs(ins[name]) do
+					if g.arcs[idx][3] == net.last[seg] then prio[name] = idx end
+				end
+			end
+		end
+	end
+	local A = #g.arcs
+	local out_of = {}
+	for _, out in ipairs(net.outputs) do out_of['out' .. out.index] = out.index end
+	local function attempt(exact)
+		local zero, one = exact and q(0) or 0, exact and q(1) or 1
+		local M_, B = {}, {}
+		for r = 1, A do
+			M_[r], B[r] = {}, {}
+			for c = 1, A do M_[r][c] = zero end
+			M_[r][r] = one
+			for o = 1, m do B[r][o] = zero end
+			local v = g.arcs[r][2]
+			local nin = #ins[v]
+			if kind[v] == 'output' then
+				B[r][out_of[v]] = exact and q(1, nin) or 1 / nin
+			elseif prio[v] then
+				if prio[v] == r then
+					for _, e2 in ipairs(outs[v]) do M_[r][e2] = M_[r][e2] - one end
+				end
+			else
+				for _, e2 in ipairs(outs[v]) do
+					M_[r][e2] = M_[r][e2] - (exact and q(1, nin) or 1 / nin)
+				end
+			end
+		end
+		return solve(M_, B, m, exact)
+	end
+	local ok, X = pcall(attempt, true)
+	local exact = ok and X ~= nil
+	if not ok then
+		if type(X) ~= 'table' or not X.overflow then error(X, 0) end
+		X = attempt(false)
+	end
+	if not X then return nil end
+	local supply = {}
+	for idx, a in ipairs(g.arcs) do
+		if kind[a[1]] == 'input' then
+			local i = tonumber(a[1]:sub(3))
+			supply[i] = supply[i] or {}
+			for o = 1, m do supply[i][o] = supply[i][o] and (supply[i][o] + X[idx][o]) or X[idx][o] end
+		end
+	end
+	return { g = g, arc = X, supply = supply, exact = exact }
+end
+
+-- Input balance: each input supplies 1/n of every output's demand (the dual of balance).
+-- Returns { balanced, worst = { i, o, v, target } } or nil.
+function N.input_balance(net)
+	local D = N.demand(net)
+	if not D then return nil end
+	local n, m = net.n, net.m
+	local target = D.exact and q(1, math.max(n, 1)) or 1 / math.max(n, 1)
+	local worst, per_input = nil, {}
+	for i = 1, n do
+		local s = D.supply[i]
+		local ok = s ~= nil
+		for o = 1, m do
+			local v = s and s[o] or (D.exact and q(0) or 0)
+			local same = (D.exact and is_q(v)) and (v == target) or math.abs(float(v) - float(target)) < 1e-9
+			if not same then
+				ok = false
+				local dev = math.abs(float(v) - float(target))
+				if not worst or dev > worst.dev then worst = { dev = dev, i = i, o = o, v = v, target = target } end
+			end
+		end
+		per_input[i] = ok
+	end
+	return { balanced = (n > 0 and m > 0 and worst == nil), worst = worst, per_input = per_input, demand = D }
+end
+
 -- ------------------------------------------------------------------ blocked outputs
 
 -- Balance with outputs blocked.  A blocked output backs up: its belt is full, so the splitter
