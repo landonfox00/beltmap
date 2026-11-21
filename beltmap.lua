@@ -1235,6 +1235,14 @@ local function path_of(pts)
 end
 
 function M.tikz(state)
+	if state.opts.view == 'wires' then
+		local code, why = M.wires_tikz(state)
+		if code then return code end
+		-- No wire diagram for this network: say why, and draw the splitter graph instead.
+		state.opts.view = 'graph'
+		state.wires_failed = why
+		if texio then texio.write_nl('term and log', 'beltmap warning: view=wires: ' .. why .. '; drawn as view=graph') end
+	end
 	if state.opts.view == 'graph' then return M.graph_tikz(state) end
 	local tr, opts, trim = state.tr, state.opts, state.trim
 	local cell = tr.cell
@@ -1583,14 +1591,9 @@ end
 -- layout of beltmap-net.lua.  Arcs are curves that leave each node to the right and enter the
 -- next from the left, each at its own point, so the two belts into or out of a splitter part;
 -- they take the colors of the layout, mix included.
-function M.graph_tikz(state)
-	local net = M.network(state)
-	if not net then fail('view=graph: ' .. (state.net_error or 'the belts could not be followed')) end
-	local g = NET.graph(net)
-	local pos, info = NET.layout(g)
+-- The belt colors (bmc*), and with mix the input and piece colors (bmi*, bmp*), as TeX.
+local function color_defs(state, w)
 	local tr, mix = state.tr, state.mix
-	local out = {}
-	local function w(s) out[#out + 1] = s end
 	local cols = M.palette(#tr.segs)
 	for k = 1, #tr.segs do
 		local col = cols[k]
@@ -1603,6 +1606,23 @@ function M.graph_tikz(state)
 			if col then w(string.format('\\definecolor{bmp%d}{RGB}{%d,%d,%d}', p - 1, col[1], col[2], col[3])) end
 		end
 	end
+end
+
+-- The color of piece p of the network: its mix, else its belt's color.
+local function piece_color(state, net, p)
+	if not p then return 'bm-idle' end
+	return state.mix and state.mix.expr[p] or ('bmc' .. (net.pieces[p].k - 1))
+end
+
+function M.graph_tikz(state)
+	local net = M.network(state)
+	if not net then fail('view=graph: ' .. (state.net_error or 'the belts could not be followed')) end
+	local g = NET.graph(net)
+	local pos, info = NET.layout(g)
+	local tr, mix = state.tr, state.mix
+	local out = {}
+	local function w(s) out[#out + 1] = s end
+	color_defs(state, w)
 	-- Layout units are about a centimeter at the default tile of 4.4mm; the graph scales with tile.
 	local S = 2.3
 	local function xy(p) return string.format('(%s,%s)', num(p[1] * S), num(p[2] * S)) end
@@ -1667,13 +1687,120 @@ function M.graph_tikz(state)
 	return out
 end
 
+-- view=wires: the canonical wire diagram of beltmap-net.lua's N.wires.  Wire 0 is on top;
+-- inputs on the left, outputs on the right, one column per layer of splitters, and each loop
+-- wire leaving on the right and coming back round underneath.  Returns nil and the reason
+-- when the network has no wire diagram.
+-- The wire diagram of a picture, searched once and kept: the alternative text needs it before
+-- the picture is drawn.
+function M.wires_data(state)
+	if state.wires == nil then
+		local net = M.network(state)
+		local D, why
+		if net then D, why = NET.wires(NET.graph(net)) else why = state.net_error or 'the belts could not be followed' end
+		state.wires, state.wires_failed = D or false, why
+	end
+	return state.wires or nil, state.wires_failed
+end
+
+function M.wires_tikz(state)
+	local D, why = M.wires_data(state)
+	if not D then return nil, why end
+	local net = M.network(state)
+	local opts = state.opts
+	local out = {}
+	local function w(s) out[#out + 1] = s end
+	color_defs(state, w)
+	local DX, DY = 2.3, 1.4
+	local nl = 0
+	for _, l in pairs(D.layer) do nl = math.max(nl, l) end
+	local xR = (nl + 1) * DX
+	local function Y(l) return -l * DY end
+	-- Bars in one layer whose spans overlap step sideways.
+	local xbar, by = {}, {}
+	for _, b in ipairs(D.bars) do
+		by[b[1]] = by[b[1]] or {}
+		table.insert(by[b[1]], b)
+	end
+	for lyr, list in pairs(by) do
+		table.sort(list, function(a, b) return a[2] < b[2] or (a[2] == b[2] and a[3] < b[3]) end)
+		local slot, used = {}, {}
+		for _, b in ipairs(list) do
+			local k = 0
+			while true do
+				local clash = false
+				for _, u in ipairs(used) do
+					if u[3] == k and not (b[3] < u[1] or b[2] > u[2]) then clash = true end
+				end
+				if not clash then break end
+				k = k + 1
+			end
+			used[#used + 1] = { b[2], b[3], k }
+			slot[b] = k
+		end
+		local ks = 0
+		for _, u in ipairs(used) do ks = math.max(ks, u[3] + 1) end
+		for _, b in ipairs(list) do xbar[b[4]] = lyr * DX + (slot[b] - (ks - 1) / 2) * 0.7 end
+	end
+	local loopline = {}
+	for _, id in ipairs(D.loops) do loopline[D.line[id]] = id end
+	-- the line an arc runs on: its own token; a loop arc's two ends share one line
+	w('\\begin{pgfonlayer}{bmarcs}')
+	local lowest = {}
+	for _, id in ipairs(D.loops) do lowest[#lowest + 1] = D.line[id] end
+	table.sort(lowest, function(a, b) return a > b end)
+	local ring = {}
+	for k, l in ipairs(lowest) do ring[l] = k end
+	local ybot = Y(D.w - 1)
+	for _, a in ipairs(D.arcs) do
+		local col = piece_color(state, net, a.piece)
+		local l = D.line[a.id]
+		local y = Y(l)
+		local x1 = (D.kind[a[1]] == 'input') and 0 or xbar[a[1]]
+		local x2 = (D.kind[a[2]] == 'output') and xR or xbar[a[2]]
+		if D.F[a.id] then
+			-- leaves its tail to the right end, round underneath, and in from the left end
+			local k = ring[l]
+			local yb = ybot - 0.9 - (k - 1) * 0.75
+			local r = 0.8 + (k - 1) * 0.35
+			w(string.format('\\draw[bm w wire={%s}] (%s,%s) -- (%s,%s) .. controls (%s,%s) and (%s,%s) .. (%s,%s) -- (%s,%s) .. controls (%s,%s) and (%s,%s) .. (%s,%s) -- (%s,%s);',
+				col, num(x1), num(y), num(xR), num(y), num(xR + 1.4 * r), num(y), num(xR + 1.4 * r), num(yb), num(xR), num(yb),
+				num(0), num(yb), num(-1.4 * r), num(yb), num(-1.4 * r), num(y), num(0), num(y), num(x2), num(y)))
+		else
+			w(string.format('\\draw[bm w wire={%s}] (%s,%s) -- (%s,%s);', col, num(x1), num(y), num(x2), num(y)))
+		end
+	end
+	w('\\end{pgfonlayer}')
+	for _, b in ipairs(D.bars) do
+		local x = xbar[b[4]]
+		w(string.format('\\draw[bm w bar] (%s,%s) -- (%s,%s);', num(x), num(Y(b[2])), num(x), num(Y(b[3]))))
+		local label = opts.numbers and b[4]:sub(2) or ''
+		w(string.format('\\node[bm w pad] at (%s,%s) {%s};', num(x), num(Y(b[2])), label))
+		w(string.format('\\node[bm w pad] at (%s,%s) {};', num(x), num(Y(b[3]))))
+	end
+	for _, a in ipairs(D.arcs) do
+		local y = Y(D.line[a.id])
+		if D.kind[a[1]] == 'input' then
+			w(string.format('\\node[bm g input] at (%s,%s) {%s};', num(0), num(y), opts.labels and a[1]:sub(3) or ''))
+		end
+		if D.kind[a[2]] == 'output' then
+			w(string.format('\\node[bm g output] at (%s,%s) {%s};', num(xR), num(y), opts.labels and a[2]:sub(4) or ''))
+		end
+	end
+	return out
+end
+
 -- A sentence for the alternative text of a tagged PDF.
 function M.describe(state)
 	local tr = state.tr
 	state.opts = state.opts or {}
 	local n_split, n_tunnel = #tr.splitters, #tr.tunnels
 	local parts = {}
-	if state.opts.view == 'graph' then
+	local D = (state.opts.view == 'wires') and M.wires_data(state)
+	if D then
+		parts[#parts + 1] = string.format('Wire diagram of a splitter network: %d splitter%s as bars across %d wire%s, %d of them loop%s',
+			n_split, n_split == 1 and '' or 's', D.w, D.w == 1 and '' or 's', #D.loops, #D.loops == 1 and '' or 's')
+	elseif state.opts.view == 'graph' then
 		parts[#parts + 1] = string.format('Splitter graph of a belt layout with %d splitter%s', n_split, n_split == 1 and '' or 's')
 	else
 		parts[#parts + 1] = string.format('Belt layout of %d by %d tiles with %d splitter%s and %d underground tunnel%s',

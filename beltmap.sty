@@ -25,7 +25,7 @@
 %   \usetikzlibrary{beltmap}        the glyphs by hand, in any tikzpicture
 % Reading, tracing and the TikZ code are done in beltmap.lua.  See beltmap-doc.pdf.
 \NeedsTeXFormat{LaTeX2e}[2024-06-01]
-\ProvidesExplPackage{beltmap}{2026-11-21}{0.1.1}{Schematic pictures of Factorio belt layouts}
+\ProvidesExplPackage{beltmap}{2026-11-21}{0.2}{Schematic pictures of Factorio belt layouts}
 
 \sys_if_engine_luatex:F
 	{
@@ -124,7 +124,7 @@
 		step .tl_set:N = \l__beltmap_step_tl ,
 		palette .choices:nn = { wheel , okabe-ito , lightness , gray } { \tl_set_eq:NN \l__beltmap_palette_tl \l_keys_choice_tl } ,
 		compare .tl_set:N = \l__beltmap_compare_tl ,
-		view .choices:nn = { graph } { \tl_set_eq:NN \l__beltmap_view_tl \l_keys_choice_tl } ,
+		view .choices:nn = { graph , wires } { \tl_set_eq:NN \l__beltmap_view_tl \l_keys_choice_tl } ,
 		view / layout .code:n = { \tl_clear:N \l__beltmap_view_tl } ,
 		expect .tl_set:N = \l__beltmap_expect_tl ,
 		columns .int_set:N = \l__beltmap_columns_int ,

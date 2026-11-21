@@ -184,6 +184,12 @@
 	bm g arc/.style={draw=#1, line width=0.17\bmunit, -{Stealth[length=0pt 3.6, width=0pt 3.2]}, shorten >=0.05\bmunit,
 		preaction={draw=bm-gbg, line width=0.42\bmunit, -}},
 	bm gcolors/.code n args={4}{\colorlet{bm-gfill}{#1}\colorlet{bm-gtext}{#2}\colorlet{bm-gink}{#3}\colorlet{bm-gbg}{#4}},
+	% view=wires: wires in the belt's color, splitters as a bar between two pads, in the
+	% colors of the graph.
+	bm w wire/.style={draw=#1, line width=0.3\bmunit, line cap=round},
+	bm w bar/.style={draw=bm-gink, line width=0.16\bmunit},
+	bm w pad/.style={rectangle, rounded corners=0.16\bmunit, fill=bm-gfill, draw=bm-gink, line width=0.05\bmunit, text=bm-gtext, inner sep=0pt,
+		minimum width=0.66\bmunit, minimum height=1.0\bmunit, font=\sffamily\bfseries\tiny},
 }
 \definecolor{bm-idle}{RGB}{206,204,198}
 \colorlet{bm-gridink}{black!55}

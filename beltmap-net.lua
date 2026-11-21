@@ -923,4 +923,335 @@ function N.layout(g, opts)
 	return pos, { back = back, col = col }
 end
 
+-- ------------------------------------------------------------------ the wire diagram
+
+-- view=wires: the network as a balancing-network diagram (Aspnes, Herlihy and Shavit), drawn
+-- the same way for isomorphic networks.  Belts are horizontal wires and a splitter is a bar
+-- joining its two wires.
+--   Loops: inside each strongly connected component, every minimum set of arcs that breaks
+--   all its cycles is tried; each arc of the set becomes a loop wire, which leaves on the
+--   right and comes back on the left.
+--   Layers: a splitter's layer is its longest path from the inputs once the loops are cut.
+--   Choices: which wire each input and loop starts on, and at each splitter which output
+--   stays on which of its two wires.  All are searched; the drawing kept has the least total
+--   bar length, then its loop wires lowest, then the least code, where the code (bars as
+--   layer, low wire, high wire; loop wires; output wires) names no node.
+-- Handles networks whose splitters each take two belts in and send two out, with no
+-- side-loads.  Returns nil and the reason otherwise, or when the search would be too large.
+local WIRES_MAX, SPLITTERS_MAX, FAS_MAX = 7, 24, 20000
+
+local function sccs(names, succ)
+	local index, low, on, stack, comps, c = {}, {}, {}, {}, {}, 0
+	local function visit(v)
+		c = c + 1
+		index[v], low[v] = c, c
+		stack[#stack + 1] = v
+		on[v] = true
+		for _, w in ipairs(succ[v]) do
+			if not index[w] then
+				visit(w)
+				low[v] = math.min(low[v], low[w])
+			elseif on[w] then
+				low[v] = math.min(low[v], index[w])
+			end
+		end
+		if low[v] == index[v] then
+			local comp = {}
+			repeat
+				local w = table.remove(stack)
+				on[w] = nil
+				comp[#comp + 1] = w
+			until w == v
+			comps[#comps + 1] = comp
+		end
+	end
+	for _, v in ipairs(names) do
+		if not index[v] then visit(v) end
+	end
+	return comps
+end
+
+local function acyclic(nodes, arcs, skip)
+	local succ, state = {}, {}
+	for _, v in ipairs(nodes) do succ[v] = {} end
+	for _, e in ipairs(arcs) do
+		if not skip[e.id] then table.insert(succ[e[1]], e[2]) end
+	end
+	local function dfs(v)
+		state[v] = 1
+		for _, w in ipairs(succ[v]) do
+			if state[w] == 1 then return false end
+			if not state[w] and not dfs(w) then return false end
+		end
+		state[v] = 2
+		return true
+	end
+	for _, v in ipairs(nodes) do
+		if not state[v] and not dfs(v) then return false end
+	end
+	return true
+end
+
+-- All k-subsets of list, in order, passed to f; stops when f returns true.
+local function subsets(list, k, f)
+	local pick = {}
+	local function rec(start, depth)
+		if depth > k then return f(pick) end
+		for i = start, #list - (k - depth) do
+			pick[depth] = list[i]
+			if rec(i + 1, depth + 1) then return true end
+		end
+		return false
+	end
+	return rec(1, 1)
+end
+
+local function binom(n, k)
+	local r = 1
+	for i = 1, k do r = r * (n - k + i) / i end
+	return r
+end
+
+-- Every feedback set minimum within each strongly connected component, or nil and a reason.
+local function feedback_choices(names, arcs)
+	local succ = {}
+	for _, v in ipairs(names) do succ[v] = {} end
+	for _, a in ipairs(arcs) do table.insert(succ[a[1]], a[2]) end
+	local per = {}
+	for _, comp in ipairs(sccs(names, succ)) do
+		local cs = {}
+		for _, v in ipairs(comp) do cs[v] = true end
+		local inner = {}
+		for _, a in ipairs(arcs) do
+			if cs[a[1]] and cs[a[2]] then inner[#inner + 1] = a end
+		end
+		if #inner > 0 then
+			table.sort(comp)
+			for k = 1, #inner do
+				if binom(#inner, k) > FAS_MAX then return nil, 'its loops are too tangled to search' end
+				local sols = {}
+				subsets(inner, k, function(pick)
+					local skip = {}
+					for _, a in ipairs(pick) do skip[a.id] = true end
+					if acyclic(comp, inner, skip) then
+						local s = {}
+						for _, a in ipairs(pick) do s[#s + 1] = a.id end
+						sols[#sols + 1] = s
+					end
+				end)
+				if #sols > 0 then
+					per[#per + 1] = sols
+					break
+				end
+			end
+		end
+	end
+	-- the product of the choices per component
+	local out = { {} }
+	for _, sols in ipairs(per) do
+		local nxt = {}
+		for _, base in ipairs(out) do
+			for _, s in ipairs(sols) do
+				local u = {}
+				for _, id in ipairs(base) do u[#u + 1] = id end
+				for _, id in ipairs(s) do u[#u + 1] = id end
+				nxt[#nxt + 1] = u
+			end
+		end
+		out = nxt
+		if #out > 64 then return nil, 'its loops can be cut in too many ways to search' end
+	end
+	return out
+end
+
+local function ch(n) return string.char(48 + n) end
+
+-- The search for one feedback set F (a set of arc ids).  Returns the best drawing or nil.
+local function wires_for(g, arcs, F, kind)
+	local ins, outs = {}, {}
+	for _, nd in ipairs(g.nodes) do ins[nd.name], outs[nd.name] = {}, {} end
+	for _, a in ipairs(arcs) do
+		table.insert(outs[a[1]], a)
+		table.insert(ins[a[2]], a)
+	end
+	local spl = {}
+	for _, nd in ipairs(g.nodes) do
+		if nd.kind == 'splitter' then spl[#spl + 1] = nd.name end
+	end
+	local layer = {}
+	local function lay(v)
+		if not layer[v] then
+			local l = 1
+			for _, a in ipairs(ins[v]) do
+				if not F[a.id] and kind[a[1]] == 'splitter' then l = math.max(l, lay(a[1]) + 1) end
+			end
+			layer[v] = l
+		end
+		return layer[v]
+	end
+	for _, v in ipairs(spl) do lay(v) end
+	table.sort(spl, function(a, b)
+		if layer[a] ~= layer[b] then return layer[a] < layer[b] end
+		return a < b
+	end)
+	-- Tokens: arc id for an arc, and #arcs + k for the right-hand end of the k-th loop.
+	local m = #arcs
+	local left, Fl, loop_of = {}, {}, {}
+	for _, a in ipairs(arcs) do
+		if kind[a[1]] == 'input' then left[#left + 1] = a.id end
+	end
+	for _, a in ipairs(arcs) do
+		if F[a.id] then
+			Fl[#Fl + 1] = a.id
+			left[#left + 1] = a.id
+			loop_of[m + #Fl] = a.id
+		end
+	end
+	local function out_tok(a)
+		if F[a.id] then
+			for k, id in ipairs(Fl) do if id == a.id then return m + k end end
+		end
+		return a.id
+	end
+	local S = {}
+	for _, v in ipairs(spl) do
+		S[#S + 1] = { layer[v], ins[v][1].id, ins[v][2].id, out_tok(outs[v][1]), out_tok(outs[v][2]), v }
+	end
+	local out_toks = {}
+	for _, a in ipairs(arcs) do
+		if kind[a[2]] == 'output' then out_toks[#out_toks + 1] = a.id end
+	end
+	local w, K = #left, #S
+	local best = { cost = math.huge }
+	local line, bars = {}, {}
+	-- The code of the drawing on the current lines, read straight (flip false) or upside down.
+	local function code_of(flip)
+		local function L(l) return flip and (w - 1 - l) or l end
+		local lp, lb, lo = {}, {}, {}
+		for _, id in ipairs(Fl) do lp[#lp + 1] = L(line[id]) end
+		table.sort(lp)
+		local low = {}
+		for i, l in ipairs(lp) do low[i] = ch(w - 1 - l) end
+		table.sort(low)
+		for i, b in ipairs(bars) do
+			local a, c = L(b[2]), L(b[3])
+			lb[i] = ch(b[1]) .. ch(math.min(a, c)) .. ch(math.max(a, c))
+		end
+		table.sort(lb)
+		for _, id in ipairs(out_toks) do lo[#lo + 1] = L(line[id]) end
+		table.sort(lo)
+		local lps, los = {}, {}
+		for i, l in ipairs(lp) do lps[i] = ch(l) end
+		for i, l in ipairs(lo) do los[i] = ch(l) end
+		return table.concat(low) .. '|' .. table.concat(lb) .. '|' .. table.concat(lps) .. '|' .. table.concat(los)
+	end
+	local function leaf(cost)
+		-- A drawing and its mirror image cost the same; only half the starts are searched, so
+		-- both are scored here.
+		for _, flip in ipairs({ false, true }) do
+			local code = code_of(flip)
+			if cost < best.cost or (cost == best.cost and code < best.code) then
+				local copy, bcopy = {}, {}
+				for k, v in pairs(line) do copy[k] = flip and (w - 1 - v) or v end
+				for i, b in ipairs(bars) do
+					local a, c = flip and (w - 1 - b[2]) or b[2], flip and (w - 1 - b[3]) or b[3]
+					bcopy[i] = { b[1], math.min(a, c), math.max(a, c), b[4] }
+				end
+				best = { cost = cost, code = code, line = copy, bars = bcopy }
+			end
+		end
+	end
+	-- A lower bound on the bars still to come: a bar is at least as long as the distance
+	-- between its two wires once both are known, and at least 1.
+	local function bound(pos)
+		local b = 0
+		for k = pos, K do
+			local i, j = line[S[k][2]], line[S[k][3]]
+			b = b + ((i and j) and math.abs(i - j) or 1)
+		end
+		return b
+	end
+	local function search(pos, cost)
+		if cost + bound(pos) > best.cost then return end
+		if pos > K then return leaf(cost) end
+		local s = S[pos]
+		local i, j = line[s[2]], line[s[3]]
+		local lo, hi = math.min(i, j), math.max(i, j)
+		for t = 1, 2 do
+			local p, q = s[4], s[5]
+			if t == 2 then p, q = q, p end
+			if not ((loop_of[p] and line[loop_of[p]] ~= lo) or (loop_of[q] and line[loop_of[q]] ~= hi)) then
+				line[p], line[q] = lo, hi
+				bars[#bars + 1] = { s[1], lo, hi, s[6] }
+				search(pos + 1, cost + hi - lo)
+				bars[#bars] = nil
+				line[p], line[q] = nil, nil
+			end
+		end
+	end
+	-- every assignment of the left-hand tokens to wires 0 .. w-1 (Heap's algorithm)
+	local perm, c = {}, {}
+	for i = 0, w - 1 do perm[i], c[i] = i, 0 end
+	local function try()
+		-- the mirror of a start puts the first token on w - 1 - perm[0]: keep one of each pair
+		if 2 * perm[0] > w - 1 then return end
+		for i, tok in ipairs(left) do line[tok] = perm[i - 1] end
+		search(1, 0)
+	end
+	try()
+	local i = 1
+	while i < w do
+		if c[i] < i then
+			if i % 2 == 0 then perm[0], perm[i] = perm[i], perm[0] else perm[c[i]], perm[i] = perm[i], perm[c[i]] end
+			try()
+			c[i] = c[i] + 1
+			i = 1
+		else
+			c[i] = 0
+			i = i + 1
+		end
+	end
+	if not best.line then return nil end
+	best.w, best.layer, best.loops, best.F, best.m = w, layer, Fl, F, m
+	return best
+end
+
+function N.wires(g)
+	local kind, names, arcs = {}, {}, {}
+	for _, nd in ipairs(g.nodes) do
+		kind[nd.name] = nd.kind
+		names[#names + 1] = nd.name
+		if nd.kind == 'merge' then return nil, 'a belt side-loads onto another' end
+	end
+	for idx, a in ipairs(g.arcs) do arcs[#arcs + 1] = { a[1], a[2], piece = a[3], id = idx } end
+	local nin, nout, nspl = {}, {}, 0
+	for _, a in ipairs(arcs) do
+		nout[a[1]] = (nout[a[1]] or 0) + 1
+		nin[a[2]] = (nin[a[2]] or 0) + 1
+	end
+	for _, v in ipairs(names) do
+		if kind[v] == 'splitter' then
+			nspl = nspl + 1
+			if nin[v] ~= 2 or nout[v] ~= 2 then return nil, 'splitter ' .. v:sub(2) .. ' does not take two belts in and send two out' end
+		end
+	end
+	if nspl > SPLITTERS_MAX then return nil, 'it has more than ' .. SPLITTERS_MAX .. ' splitters' end
+	local choices, why = feedback_choices(names, arcs)
+	if not choices then return nil, why end
+	local best
+	for _, ids in ipairs(choices) do
+		local F, nwires = {}, 0
+		for _, id in ipairs(ids) do F[id] = true end
+		for _, a in ipairs(arcs) do
+			if kind[a[1]] == 'input' or F[a.id] then nwires = nwires + 1 end
+		end
+		if nwires > WIRES_MAX then return nil, 'it needs more than ' .. WIRES_MAX .. ' wires' end
+		local r = wires_for(g, arcs, F, kind)
+		if r and (not best or r.cost < best.cost or (r.cost == best.cost and r.code < best.code)) then best = r end
+	end
+	if not best then return nil, 'no drawing was found' end
+	best.arcs, best.kind = arcs, kind
+	return best
+end
+
 return N

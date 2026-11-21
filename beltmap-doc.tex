@@ -16,7 +16,7 @@
 
 %!TeX program = lualatex
 % =============================================================================
-% beltmap 0.1.1                                                      2026-11-21
+% beltmap 0.2                                                        2026-11-21
 %
 % Manual of beltmap.sty. Every picture in it is drawn by the package from the
 % files in examples/, so building it is also the visual test.
@@ -44,7 +44,7 @@
 	\begin{center}
 		{\LARGE\textsf{beltmap}: schematic pictures of Factorio belt layouts\par}
 		\smallskip
-		{\large version 0.1.1, 2026-11-21\par}
+		{\large version 0.2, 2026-11-21\par}
 	\end{center}
 
 	\textsf{beltmap} draws belt balancers and other belt-and-splitter layouts in LuaLaTeX. It reads Factorio-SAT tiles, search records, and Factorio blueprint strings of version 1.1 and 2.0, or a layout typed as a character grid, traces every belt from splitter to splitter, and draws the result in TikZ under one of five themes.
@@ -231,7 +231,7 @@
 		\key{palette} & \key{wheel} & \key{wheel}, \key{okabe-ito}, \key{lightness}, or \key{gray} (the default in \key{print}) \\
 		\key{expect} & & a list of \key{balanced}, \key{unbalanced}, \key{lanes}, \key{throughput}, \key{limited}: stop when the layout is not so (section~\ref{sec:exact}) \\
 		\key{throughput} & \key{false} & run the max-flow test and mark the cut (section~\ref{sec:tp}) \\
-		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}) \\
+		\key{view} & \key{layout} & \key{graph}: the splitter graph instead (section~\ref{sec:graph}); \key{wires}: the wire diagram (section~\ref{sec:wires}) \\
 		\key{numbers} & \key{false} & splitter numbers on the layout, as in the graph \\
 		\key{compare} & & a layout file: mark the tiles that differ from it \\
 		\key{step} & & one step of the flow, as in \cs{beltanimation} \\
@@ -417,6 +417,29 @@
 		\end{tabular}
 	\end{center}
 
+	\section{The wire diagram}
+	\label{sec:wires}
+
+	\key{view=wires} draws the network as a wire diagram, the notation of balancing networks: each belt is a horizontal wire, and a splitter is a bar between the two wires it joins. Inputs enter on the left and outputs leave on the right. A belt that closes a loop leaves on the right, runs back underneath the diagram, and comes in again on the left.
+
+	The picture depends only on the network. Two layouts with the same splitter network get the same picture, whatever their positions, numbering, or input order, and two different pictures are two different networks. beltmap gets there by a search. Loops are cut inside each strongly connected component, at every smallest set of belts that leaves no cycle. Each splitter takes the column of its longest path from the inputs. Every way of placing the inputs and loops on the wires, and of sending a splitter's two outputs onto its two wires, is tried. The drawing kept has the least total length of bars, then its loop wires lowest, then the least code, a description of the bars and wires that names no splitter or input. The rule picks one drawing for every network; it need not show the network's symmetries.
+
+	\key{labels} numbers the inputs and outputs as in the layout, and \key{numbers} numbers the splitters as \key{numbers} does on the layout. Both say which belt of this layout is which, so they differ between layouts of the same network. \key{mix} colors the wires by what they carry.
+
+	\begin{center}
+		\begin{tabular}{@{}c@{\qquad}c@{}}
+			\beltlayout[tile=2.6mm]{examples/f00_9x10.json} & \beltlayout[tile=2.6mm]{examples/f01_9x10.json} \\
+			\beltlayout[view=wires, tile=3.4mm]{examples/f00_9x10.json} & \beltlayout[view=wires, tile=3.4mm]{examples/f01_9x10.json} \\[2pt]
+			\multicolumn{2}{@{}c@{}}{\small two layouts, one network, one wire diagram}
+		\end{tabular}
+
+		\bigskip
+		\beltlayout[view=wires, mix, labels, numbers]{examples/f04_11x8.txt}\par\smallskip
+		\small\key{view=wires, mix, labels, numbers}: two loops
+	\end{center}
+
+	The search covers networks whose splitters each take two belts in and send two out, with no side-loading, up to $7$ wires (inputs and loops together) and $24$ splitters; a $5$-to-$5$ balancer takes a second or two. For any other network the log gets a warning and the picture is drawn as \key{view=graph}. Splitter priorities and filters are not drawn.
+
 	\section{Comparing two layouts}
 
 	\key{compare=}\emph{file} draws the layout and marks how it differs from the layout in the file. Tiles the other layout lacks are shaded green, tiles that hold something else are shaded amber, and tiles only the other layout uses are outlined in red. The two are lined up by their top left entities; \key{flow} turns both.
@@ -474,6 +497,7 @@ python beltmap_export.py examples/f00_9x10.json --keys "mix, labels" --gif f00.g
 		\item A side-load onto an underground belt is traced as one onto a belt, onto the near lane; the game's rule there was not checked. No layout with a side-load was measured in the game.
 		\item Blueprints were tested in Factorio 2.1.24 only. Strings in 1.1 numbering went through that version's import, not into Factorio 1.1, and no 2.0 release was tried. Written in 1.1 numbering, a filter loses its quality, which 1.1 does not have.
 		\item Entities other than belts, underground belts, and splitters are left out, and counted in the log.
+		\item \key{view=wires} needs every splitter to take two belts in and send two out, with no side-loads, and at most $7$ wires; otherwise it draws \key{view=graph}. It does not draw priorities or filters.
 		\item Labels of a layout that runs up or down overlap when longer than a tile is wide.
 		\item In \key{transit}, belts carry no arrowheads; direction shows on splitters and portals only.
 		\item \key{mix} has no belt capacity: it judges whether a layout balances, and \key{throughput} only runs the max-flow test, which is necessary for full throughput but not sufficient. Filters are ignored: every item is the same item.
