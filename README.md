@@ -2,9 +2,9 @@
 
 Schematic pictures of Factorio belt layouts in LuaLaTeX.
 
-Version 0.4, 2026-11-21.
+Version 0.5, 2026-11-21.
 
-`beltmap` draws belt balancers and other belt-and-splitter layouts. It reads Factorio-SAT tile files, Factorio blueprint strings and books (1.1 and 2.0), or a layout typed as a character grid. It traces every belt from splitter to splitter and draws the result in TikZ under one of five themes. On the traced network it computes the exact share of every input on every output, runs a max-flow throughput test, checks the balance with any outputs blocked, and draws the splitter graph, or a wire diagram that is the same for every layout of the same network. Game icons come from your own copy of Factorio; the package ships none. Every picture also yields the blueprint string of the layout as drawn, which can be attached to the PDF. In a tagged document every picture gets generated alternative text.
+`beltmap` draws belt balancers and other belt-and-splitter layouts. It reads Factorio-SAT tile files, Factorio blueprint strings and books (1.1 and 2.0), or a layout typed as a character grid. It traces every belt from splitter to splitter and draws the result in TikZ under one of five themes. On the traced network it computes the exact share of every input on every output, runs a max-flow throughput test, checks the balance with any outputs blocked, colors belts so that gray means balanced (with marks for input and output balance), and draws the splitter graph, or a wire diagram that is the same for every layout of the same network. Game icons come from your own copy of Factorio; the package ships none. Every picture also yields the blueprint string of the layout as drawn, which can be attached to the PDF. In a tagged document every picture gets generated alternative text.
 
 ```latex
 \usepackage{beltmap}
