@@ -10,6 +10,9 @@
 """
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import sys
 import zipfile
 import zlib
@@ -73,10 +76,20 @@ if pdf:
 	pages = len(re.findall(rb'/Type\s*/Page[^s]', blob))
 	if pages < 10:
 		problems.append(f'beltmap-doc.pdf: only {pages} pages')
+	# the version on the manual's title page, read as text (the PDF's own bytes hold glyph codes)
 	sty = z.read('beltmap/beltmap.sty').decode('utf-8')
 	m = re.search(r'\\ProvidesExplPackage\{beltmap\}\{([^}]*)\}\{([^}]*)\}', sty)
-	if m and (b'version ' + m.group(2).encode()) not in blob and m.group(2).encode() not in blob:
-		problems.append(f'beltmap-doc.pdf: version {m.group(2)} not found in the manual')
+	if m and shutil.which('pdftotext'):
+		with tempfile.TemporaryDirectory() as tmp:
+			p = os.path.join(tmp, 'manual.pdf')
+			with open(p, 'wb') as f:
+				f.write(pdf)
+			text = subprocess.run(['pdftotext', '-l', '1', p, '-'], capture_output=True, text=True, errors='replace').stdout
+		want = f'version {m.group(2)}, {m.group(1)}'
+		if want not in text:
+			problems.append(f'beltmap-doc.pdf: the title page does not say "{want}"')
+	elif m:
+		print('  (pdftotext missing: the title page was not read)')
 	print(f'manual: {pages} pages')
 
 print(f'{path}: {len(names)} files, {len(examples)} examples, {os.path.getsize(path) // 1024} KB')

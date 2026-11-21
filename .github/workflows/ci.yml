@@ -15,6 +15,7 @@ name: ci
 #              (tests/check_dist.py), and the manual is PDF/UA-2. The archive and manual are
 #              kept as artifacts.
 #   minimum    TeX Live 2024: the oldest TeX Live the package claims (\NeedsTeXFormat 2024-06-01).
+#              Everything but the tagged document (tagging=on needs LaTeX 2024-11 or later).
 #   windows    the Lua suite and the main documents on Windows, through tlmgr.
 #
 # Toolchain. The blocking jobs run TeXLib's CI image BY DIGEST: TeX Live 2026 (texlive-full
@@ -128,7 +129,9 @@ jobs:
             command -v python3 >/dev/null || { apt-get update -qq && apt-get install -y -qq python3 poppler-utils >/dev/null; }
             command -v pdfimages >/dev/null || { apt-get update -qq && apt-get install -y -qq poppler-utils >/dev/null; }
             texlua tests/run.lua
-            python3 tests/run_latex.py --no-export'
+            # tagging=on in \DocumentMetadata arrived with LaTeX 2024-11; the package itself
+            # does not need it, so the tagged document is the one test left out here
+            python3 tests/run_latex.py --no-export --without tagging'
       - name: Keep the runs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

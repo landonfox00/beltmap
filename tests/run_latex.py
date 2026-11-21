@@ -12,6 +12,8 @@ Every tests/latex/*.tex starts with lines `% test: key=value`:
     fixture=factorio                   a fake Factorio data folder, as \\fixturedata
     no-game=yes                        no data folder anywhere (FACTORIO_DATA cleared)
     pdfua=yes                          PDF/UA-2 by veraPDF, when --verapdf is given
+    needs=FEATURE                      skipped with --without FEATURE (tagging: \\DocumentMetadata
+                                       with tagging=on, which LaTeX before 2024-11 does not have)
 Each document runs in its own folder under tests/tmp/latex, with paths.tex defining \\examples
 (the examples folder) and \\fixturedata.  BELTMAP_NO_ICON_SEARCH=1 is set for every run, so no
 result depends on a game installed on the machine.  The export script is checked too.
@@ -113,9 +115,13 @@ def env_for(spec):
 	return e
 
 
-def run_doc(path, run, verapdf, engines):
+def run_doc(path, run, verapdf, engines, without=()):
 	name = os.path.splitext(os.path.basename(path))[0]
 	spec = spec_of(path)
+	if spec.get('needs') in without:
+		print(f'skip  {name} (needs {spec["needs"]})')
+		run.skips += 1
+		return
 	if spec['engine'] not in engines:
 		print(f'skip  {name} ({spec["engine"]} not selected)')
 		run.skips += 1
@@ -203,14 +209,16 @@ def main():
 	ap.add_argument('--engines', default='lualatex,pdflatex,xelatex')
 	ap.add_argument('--no-export', action='store_true')
 	ap.add_argument('--allow-missing-tools', action='store_true')
+	ap.add_argument('--without', default='', help='comma-separated features the TeX Live lacks, e.g. tagging')
 	a = ap.parse_args()
+	without = {w for w in a.without.split(',') if w}
 	engines = set(a.engines.split(','))
 	run = Run(a.allow_missing_tools)
 	docs = sorted(f for f in os.listdir(os.path.join(HERE, 'latex')) if f.endswith('.tex'))
 	for f in docs:
 		if a.names and not any(n in f for n in a.names):
 			continue
-		run_doc(os.path.join(HERE, 'latex', f), run, a.verapdf, engines)
+		run_doc(os.path.join(HERE, 'latex', f), run, a.verapdf, engines, without)
 	if not a.no_export and (not a.names or 'export' in a.names):
 		run_export(run)
 	print(f'\n{run.passes} checks passed, {len(run.fails)} failed, {run.skips} skipped')

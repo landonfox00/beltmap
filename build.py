@@ -37,15 +37,33 @@ def read(path):
 		return f.read()
 
 
+# Streams that hold no text a person wrote: font programs and images.  Their bytes, compressed or
+# not, can spell anything (a font once matched the e-mail pattern), so they are not scanned.
+BINARY_STREAM = re.compile(rb'/Length[123]\b|/FontFile|/Subtype\s*/(?:Type1C|CIDFontType0C|OpenType|Image)')
+
+
 def pdf_text(path):
+	"""The text of a PDF worth scanning: everything outside streams, and every stream inflated,
+	but not font programs or images."""
 	data = open(path, 'rb').read()
-	parts = [data]
+	parts, pos = [], 0
 	for m in re.finditer(rb'stream\r?\n', data):
+		if data[m.start() - 3:m.start()] == b'end':
+			continue
 		end = data.find(b'endstream', m.end())
-		try:
-			parts.append(zlib.decompressobj().decompress(data[m.end():end]))
-		except zlib.error:
-			pass
+		if end < 0:
+			break
+		head = data[pos:m.start()]
+		parts.append(head)
+		# the object's own dictionary: from its "obj" keyword to "stream"
+		dictionary = head[head.rfind(b'obj'):]
+		if not BINARY_STREAM.search(dictionary):
+			try:
+				parts.append(zlib.decompressobj().decompress(data[m.end():end]))
+			except zlib.error:
+				pass
+		pos = end + len(b'endstream')
+	parts.append(data[pos:])
 	return b'\n'.join(parts).decode('latin-1')
 
 
