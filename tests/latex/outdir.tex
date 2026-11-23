@@ -1,0 +1,19 @@
+% -output-directory: written blueprints and the book go there, and are attached from there.
+% test: engine=lualatex
+% test: expect=ok
+% test: output-directory=out
+% test: file-exists=out/outdir-blueprint-1.txt
+% test: file-exists=out/outdir-book.txt
+% test: file-absent=outdir-blueprint-1.txt
+% test: file-absent=outdir-book.txt
+% test: attachments>=2
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\beltmapbook[out]
+\begin{document}
+\begin{beltgrid}[blueprint]
+> S> > \\
+> S> >
+\end{beltgrid}
+\end{document}

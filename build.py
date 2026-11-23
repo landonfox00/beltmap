@@ -4,8 +4,9 @@
     python build.py --no-pdf   # stage and scan only
 
 Version and date are read from \\ProvidesExplPackage in beltmap.sty; to release, change them there
-and in the title block of beltmap-doc.tex. The manual is compiled in build/beltmap/ (two LuaLaTeX
-runs, about 2.5 min) with its PDF dates fixed to the release date, UTC.
+and in the title block of beltmap-doc.tex. The manual is compiled in build/beltmap/ (three LuaLaTeX
+runs, about 3 min: the table of contents moves the pages on the second, and the tagging of a page
+needs the page numbers of the run before) with its PDF dates fixed to the release date, UTC.
 
 Before zipping, every staged file (the PDF's streams inflated) is scanned for e-mail addresses and
 local paths, and for the extra patterns in .leak-patterns (one regular expression per line, not
@@ -24,7 +25,7 @@ import zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(HERE, 'build')
 STAGE = os.path.join(BUILD, 'beltmap')
-SHIP = ['README.md', 'beltmap.sty', 'tikzlibrarybeltmap.code.tex', 'beltmap.lua', 'beltmap-net.lua',
+SHIP = ['README.md', 'CHANGELOG.md', 'beltmap.sty', 'tikzlibrarybeltmap.code.tex', 'beltmap.lua', 'beltmap-net.lua',
 	'beltmap_export.py', 'beltmap-doc.tex', 'examples']
 DOC = 'beltmap-doc.tex'
 
@@ -103,7 +104,7 @@ def main():
 	if not a.no_pdf:
 		epoch = int(datetime.datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=datetime.timezone.utc).timestamp())
 		env = dict(os.environ, SOURCE_DATE_EPOCH=str(epoch), FORCE_SOURCE_DATE='1', TZ='UTC')
-		for run in (1, 2):
+		for run in (1, 2, 3):
 			r = subprocess.run(['lualatex', '-interaction=nonstopmode', '-halt-on-error', DOC], cwd=STAGE, env=env,
 				capture_output=True, text=True, errors='replace')
 			if r.returncode != 0:

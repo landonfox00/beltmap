@@ -1,0 +1,9 @@
+{
+  "name": "beltmap-fullload",
+  "version": "0.1.0",
+  "title": "beltmap full-load test",
+  "author": "beltmap",
+  "factorio_version": "2.1",
+  "dependencies": ["base"],
+  "description": "Measures the throughput of belt layouts for beltmap's full-load model."
+}

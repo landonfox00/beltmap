@@ -10,3 +10,4 @@ tests/golden/actual/
 *-blueprint-*.txt
 *-book.txt
 __pycache__/
+*.beltmap-cache

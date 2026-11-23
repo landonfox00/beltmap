@@ -1,0 +1,12 @@
+% expect=same-network without the key that names the other layout is an error.
+% test: engine=lualatex
+% test: expect=fail
+% test: log-contains=needs the key same network=file
+\documentclass{article}
+\usepackage{beltmap}
+\begin{document}
+\begin{beltgrid}[expect=same-network]
+> S> > \\
+> S> >
+\end{beltgrid}
+\end{document}

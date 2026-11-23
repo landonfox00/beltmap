@@ -18,7 +18,7 @@ import zipfile
 import zlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-EXPECTED = {'README.md', 'beltmap.sty', 'tikzlibrarybeltmap.code.tex', 'beltmap.lua', 'beltmap-net.lua',
+EXPECTED = {'README.md', 'CHANGELOG.md', 'beltmap.sty', 'tikzlibrarybeltmap.code.tex', 'beltmap.lua', 'beltmap-net.lua',
 	'beltmap_export.py', 'beltmap-doc.tex', 'beltmap-doc.pdf'}
 
 path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, 'build', 'beltmap.zip')
@@ -76,6 +76,11 @@ if pdf:
 	pages = len(re.findall(rb'/Type\s*/Page[^s]', blob))
 	if pages < 10:
 		problems.append(f'beltmap-doc.pdf: only {pages} pages')
+	# the tagging the LaTeX team asked for: a Title element, and table header cells
+	if not re.search(rb'/S\s*/Title\b', blob):
+		problems.append('beltmap-doc.pdf: the title is not tagged as Title')
+	if not re.search(rb'/S\s*/TH\b', blob):
+		problems.append('beltmap-doc.pdf: no table declares a header row')
 	# the version on the manual's title page, read as text (the PDF's own bytes hold glyph codes)
 	sty = z.read('beltmap/beltmap.sty').decode('utf-8')
 	m = re.search(r'\\ProvidesExplPackage\{beltmap\}\{([^}]*)\}\{([^}]*)\}', sty)

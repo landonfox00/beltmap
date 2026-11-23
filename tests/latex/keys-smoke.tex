@@ -18,6 +18,7 @@
 \beltlayout[mix=strict, marks, demand, tile=2mm]{\f}
 \beltlayout[mix=check, marks, throughput, blocked, tile=2mm]{\f}
 \beltlayout[focus=2, labels, tile=2mm]{\f}
+\beltlayout[lane balance, full load, same network=\examples/f01_9x10.json, tile=2mm]{\f}
 \beltlayout[palette=okabe-ito, mix, tile=2mm]{\f}
 \beltlayout[palette=lightness, mix, tile=2mm]{\f}
 \beltlayout[grid=strong, grid major=5, rulers, dimensions, tile=2mm]{\f}
@@ -27,7 +28,7 @@
 \beltlayout[step=3, mix=strict, tile=2mm]{\f}
 \beltlayout[annotate={\draw[red] (tile cs:x=1,y=1) circle (0.4);}, tile=2mm]{\f}
 
-\beltmapverdict\par\beltmapthroughput\par\beltmapblocked\par\beltmapinputs\par\beltmapcaption\par\beltmapmatrix
+\beltmapverdict\par\beltmapthroughput\par\beltmapblocked\par\beltmapinputs\par\beltmaplanebalance\par\beltmapfullload\par\beltmapsame\par\beltmapcaption\par\beltmapmatrix
 
 \beltblueprint[inputs={A,B}, outputs={left, right}]{0eNqtkMEKwjAQRH9F9rxKGxuh+RURaXXVQJqEZCtK6b8bFUWsPYiewmZ2HrPTQW1a8kFbBtWBZmpAvfwhkGXNmiKoZXcfzmvbNjUFUDmCdzHJzl7dJ1DZTCKcb2+PsNWBNne1QLBVQwnOobLRu8DTmgxDjwOsGGDFP7Dz0bT5L9higM2f2GwMG73RzMmOoK1veZ3qdiFhk2Zody3etfwmBL0/fIwgRwv74rIVwpFCvG3JhSiLspRSyMVcZAimSkvJ9EgzeR7Q9xciZMEQ}
 \beltmapprintstring[8cm]

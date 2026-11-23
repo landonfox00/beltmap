@@ -760,9 +760,17 @@ function M.trace(L, gap)
 		if not tr.on[c.k] and cell[c.k].type ~= 'splitter' then walk(c, nil) end
 	end
 
+	-- A belt that starts where others side-load onto it is fed by them: it is not an input.
+	local side_fed = {}
+	for _, s in ipairs(tr.segs) do
+		if s['end'][1] == 'side' and s['end'][2] then side_fed[s['end'][2].k] = true end
+	end
+	tr.side_fed = side_fed
 	tr.inputs, tr.outputs = {}, {}
 	for _, s in ipairs(tr.segs) do
-		if s.src == nil and #s.tiles > 0 and cell[s.tiles[1].k].type == 'belt' then tr.inputs[#tr.inputs + 1] = s.tiles[1] end
+		if s.src == nil and #s.tiles > 0 and cell[s.tiles[1].k].type == 'belt' and not side_fed[s.tiles[1].k] then
+			tr.inputs[#tr.inputs + 1] = s.tiles[1]
+		end
 		if s['end'][1] == 'out' then tr.outputs[#tr.outputs + 1] = { s['end'][2], s['end'][3] } end
 	end
 	local w, h = L.w, L.h
@@ -964,11 +972,12 @@ function M.throughput(state)
 	local net = M.network(state)
 	state.tp = false
 	if not net or net.n == 0 or net.m == 0 then return false end
-	local r = NET.throughput(net)
-	local which = (r.rule == 'every') and 'no choice of inputs and outputs' or 'no choice of as many outputs as inputs'
+	local r = M.cached(state, 'throughput', function() return NET.throughput(net) end)
 	local text
-	if not r.limited then
-		text = string.format('passes the max-flow test: %s is held below min($|I|$, $|O|$) belts by a cut (%d choices; necessary for throughput-unlimited, not sufficient)', which, r.tested)
+	if not r.limited and r.partial then
+		text = string.format('max-flow test undecided: %d of %.0f choices of equal size tried, none short', r.tested, r.total)
+	elseif not r.limited then
+		text = string.format('passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (%d choices of equal size decide it; necessary for throughput-unlimited, not sufficient)', r.tested)
 	else
 		local L = r.limited
 		local belts = {}
@@ -984,8 +993,80 @@ function M.throughput(state)
 			text = text .. string.format(' (the %d lane%s marked form a cut)', #L.cut, #L.cut == 1 and '' or 's')
 		end
 	end
-	state.tp = { verdict = text, ok = (r.limited == nil), limited = r.limited, tested = r.tested }
+	local verdict_ok = false
+	if not r.limited then
+		if r.partial then verdict_ok = nil else verdict_ok = true end
+	end
+	state.tp = { verdict = text, ok = verdict_ok, limited = r.limited, tested = r.tested, partial = r.partial }
 	return state.tp
+end
+
+-- lane balance=true: the two lanes of every output carry the same of every input lane.
+function M.lane_balance(state)
+	if state.lbal ~= nil then return state.lbal end
+	state.lbal = false
+	local net = M.network(state)
+	if not net or net.n == 0 or net.m == 0 then return false end
+	local r = NET.lane_balance(net)
+	if not r then
+		state.lbal = { verdict = 'no lane-balance verdict: a loop keeps items forever' }
+		return state.lbal
+	end
+	local text
+	if r.balanced then
+		text = 'lane balanced: the two lanes of every output carry the same amount of every input lane (at light load)'
+	else
+		local w = r.worst
+		text = string.format('not lane balanced: of the %s lane of input %d, output %d carries %s on its left lane and %s on its right (at light load)',
+			w.l == 1 and 'left' or 'right', w.i, w.o, pct(w.left), pct(w.right))
+	end
+	state.lbal = { verdict = text, balanced = r.balanced }
+	return state.lbal
+end
+
+-- full load=true: the fluid model of full belts, for every choice of inputs and outputs.
+function M.full_load(state)
+	if state.full ~= nil then return state.full end
+	state.full = false
+	local net = M.network(state)
+	if not net or net.n == 0 or net.m == 0 then return false end
+	local r = M.cached(state, 'full load', function() return NET.full_load(net) end)
+	local text, ok
+	if r.worst then
+		local w = r.worst
+		ok = false
+		text = string.format('limited at full load: inputs %s to outputs %s pass %.2f of %d belt%s in the fluid model',
+			table.concat(w.I, ', '), table.concat(w.O, ', '), w.flow, w.need, w.need == 1 and '' or 's')
+	elseif r.partial then
+		text = string.format('full load undecided: %d of %.0f choices tried, none short in the fluid model', r.tested, r.total)
+	else
+		ok = true
+		text = string.format('passes at full load: every choice of inputs and outputs carries min($|I|$, $|O|$) belts in the fluid model (%d choices)', r.tested)
+	end
+	state.full = { verdict = text, ok = ok, worst = r.worst, tested = r.tested, partial = r.partial }
+	return state.full
+end
+
+-- same network=file: the same network as the layout in the file, up to renaming.
+function M.same_network(state, path)
+	if state.same ~= nil then return state.same end
+	state.same = false
+	local net = M.network(state)
+	if not net then return false end
+	local L = M.layout_from_file(path, {})
+	local other = NET.build(M.trace(L, L.gap or 10))
+	local r = NET.same_network(net, other)
+	local name = path:gsub('.*/', ''):gsub('_', '\\_')
+	local text
+	if r == nil then
+		text = 'same network undecided: the search for a match ran too long'
+	elseif r then
+		text = 'the same network as ' .. name
+	else
+		text = 'a different network from ' .. name
+	end
+	state.same = { verdict = text, ok = r }
+	return state.same
 end
 
 -- Input balance (beltmap-net.lua's N.input_balance), as a verdict: at full backpressure, each
@@ -1036,7 +1117,12 @@ end
 function M.blocked(state)
 	if state.blk ~= nil then return state.blk end
 	state.blk = false
-	local r, why = NET.blocked(state.tr)
+	local why
+	local r = M.cached(state, 'blocked', function()
+		local res, reason = NET.blocked(state.tr)
+		why = reason
+		return res
+	end)
 	if not r then
 		state.blk = { verdict = 'no blocked-output test: ' .. why }
 		return state.blk
@@ -1378,6 +1464,9 @@ function M.prepare(L, opts)
 	if opts.marks then M.marks(state) end
 	if opts.throughput then M.throughput(state) end
 	if opts.blocked then M.blocked(state) end
+	if opts.lane_balance then M.lane_balance(state) end
+	if opts.full_load then M.full_load(state) end
+	if opts.same_network then M.same_network(state, opts.same_network) end
 	if opts.compare then state.diff = M.diff(L, M.rotate(M.layout_from_file(opts.compare, {}), turns)) end
 	return state
 end
@@ -2066,6 +2155,9 @@ function M.describe(state)
 	if state.tp then parts[#parts + 1] = 'Throughput: ' .. plain(state.tp.verdict) end
 	if state.blk then parts[#parts + 1] = 'With outputs blocked: ' .. plain(state.blk.verdict) end
 	if state.ibal and state.opts.marks then parts[#parts + 1] = 'Input balance: ' .. plain(state.ibal.verdict) end
+	if state.lbal then parts[#parts + 1] = 'Lanes: ' .. plain(state.lbal.verdict) end
+	if state.full then parts[#parts + 1] = 'At full load: ' .. plain(state.full.verdict) end
+	if state.same then parts[#parts + 1] = 'Network: ' .. plain(state.same.verdict):gsub('\\_', '_') end
 	if state.diff then
 		parts[#parts + 1] = string.format('Compared with another layout: %d tiles added, %d removed, %d changed', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -2087,9 +2179,20 @@ function M.caption(state)
 	parts[#parts + 1] = string.format('%d tunnel%s', #tr.tunnels, #tr.tunnels == 1 and '' or 's')
 	if state.bal and state.bal.balanced ~= nil then parts[#parts + 1] = state.bal.balanced and 'balanced' or 'not balanced' end
 	if state.opts.lanemix and state.bal and state.bal.lanes ~= nil then parts[#parts + 1] = state.bal.lanes and 'lanes kept' or 'lanes not kept' end
-	if state.tp then parts[#parts + 1] = state.tp.ok and 'passes max-flow' or 'throughput limited' end
+	if state.tp then
+		local t = 'throughput limited'
+		if state.tp.ok then t = 'passes max-flow' elseif state.tp.ok == nil then t = 'max-flow undecided' end
+		parts[#parts + 1] = t
+	end
 	if state.blk and state.blk.ok ~= nil then parts[#parts + 1] = state.blk.ok and 'balanced when blocked' or 'unbalanced when blocked' end
 	if state.ibal and state.ibal.balanced ~= nil and state.opts.marks then parts[#parts + 1] = state.ibal.balanced and 'input balanced' or 'not input balanced' end
+	if state.lbal and state.lbal.balanced ~= nil then parts[#parts + 1] = state.lbal.balanced and 'lane balanced' or 'not lane balanced' end
+	if state.full then
+		local t = 'full load undecided'
+		if state.full.ok then t = 'passes full load' elseif state.full.ok == false then t = 'limited at full load' end
+		parts[#parts + 1] = t
+	end
+	if state.same and state.same.ok ~= nil then parts[#parts + 1] = state.same.ok and 'same network' or 'different network' end
 	if state.diff then
 		parts[#parts + 1] = string.format('+%d $-$%d $\\sim$%d tiles', state.diff.added, state.diff.removed, state.diff.changed)
 	end
@@ -2198,6 +2301,23 @@ local GLYPH_ALT = {
 
 -- ------------------------------------------------------------------ the TeX side
 
+-- Where files written during the run belong: -output-directory, as kpathsea reports it, or as
+-- given on the command line.  Returns a prefix ending in a slash, or ''.
+local function output_prefix()
+	local d = os.getenv('TEXMF_OUTPUT_DIRECTORY')
+	if not d or d == '' then
+		for _, a in ipairs(arg or {}) do
+			local v = a:match('^%-%-?output%-directory=(.+)$')
+			if v then d = v end
+		end
+	end
+	if not d or d == '' or d == '.' then return '' end
+	d = d:gsub('\\', '/')
+	if d:sub(-1) ~= '/' then d = d .. '/' end
+	return d
+end
+M.output_prefix = output_prefix
+
 local current
 local function topt(name)
 	local v = token.get_macro('l__beltmap_' .. name .. '_tl')
@@ -2205,6 +2325,15 @@ local function topt(name)
 	v = v:gsub('^%s+', ''):gsub('%s+$', '')
 	if v == '' then return nil end
 	return v
+end
+
+-- A key that takes a number: a value that is not one is an error, never ignored.
+local function number(name, key)
+	local v = topt(name)
+	if v == nil then return nil end
+	local x = tonumber(v)
+	if x == nil then fail(key .. '=' .. v .. ': a number is needed') end
+	return x
 end
 
 local function bool(name)
@@ -2215,7 +2344,7 @@ end
 
 local function tex_options(L)
 	local o = {}
-	o.gap = tonumber(topt('gap') or '')
+	o.gap = number('gap', 'gap')
 	o.tier = topt('tier')
 	local trim = topt('trim')
 	o.trim = (trim == nil or trim == 'auto') and 'auto' or trim == 'true'
@@ -2225,11 +2354,15 @@ local function tex_options(L)
 	o.mix = topt('mix')
 	if o.mix == 'none' then o.mix = nil end
 	o.lanemix = bool('mixlanes')
-	o.focus = tonumber(topt('focus') or '')
-	o.step = tonumber(topt('step') or '')
+	o.focus = number('focus', 'focus')
+	o.step = number('step', 'step')
 	o.palette = topt('palette')
 	o.throughput = bool('throughput')
 	o.blocked = bool('blocked')
+	o.lane_balance = bool('lanebalance')
+	o.full_load = bool('fullload')
+	o.same_network = topt('samenetwork')
+	M.cache_on = bool('cache') or false
 	o.marks = bool('marks')
 	o.demand = bool('demand')
 	o.numbers = bool('numbers')
@@ -2245,9 +2378,13 @@ local function tex_options(L)
 		o.grid = true
 		o.grid_level = (grid == 'faint' or grid == 'strong') and grid or 'normal'
 	end
-	o.grid_major = tonumber(topt('gridmajor') or '')
+	o.grid_major = number('gridmajor', 'grid major')
 	local rulers = topt('rulers')
-	o.rulers = (rulers and rulers ~= 'none') and (tonumber(rulers) or 1) or nil
+	if rulers == 'none' then
+		o.rulers = nil
+	elseif rulers then
+		o.rulers = number('rulers', 'rulers')
+	end
 	o.dimensions = bool('dimensions')
 	o.labels = bool('labels')
 	o.open_ends = bool('openends')
@@ -2262,8 +2399,8 @@ local function load_opts()
 	local numbering = topt('factorio')
 	return {
 		pick = topt('pick'),
-		record = tonumber(topt('record') or ''),
-		index = tonumber(topt('index') or ''),
+		record = number('record', 'record'),
+		index = number('index', 'index'),
 		label = topt('label'),
 		numbering = numbering == '1.1' and 8 or (numbering == '2.0' and 16 or nil),
 	}
@@ -2272,8 +2409,8 @@ end
 local function plain(s) return (s:gsub('\\%%', '%%'):gsub('%$', '')) end
 
 -- expect={balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced, input-balanced,
--- input-unbalanced}: stop with an error when the layout
--- is not what the document says it is.
+-- input-unbalanced, lane-balanced, lane-unbalanced, full-load, full-load-limited, same-network,
+-- different-network}: stop with an error when the layout is not what the document says it is.
 local function check_expect(state, list)
 	for _, e in ipairs(list) do
 		local ok, why
@@ -2309,8 +2446,31 @@ local function check_expect(state, list)
 			else
 				ok, why = (e == 'throughput') == t.ok, t.verdict
 			end
+		elseif e == 'lane-balanced' or e == 'lane-unbalanced' then
+			local b = M.lane_balance(state)
+			if not b or b.balanced == nil then
+				ok, why = false, b and b.verdict or 'the layout has no inputs or no outputs'
+			else
+				ok, why = (e == 'lane-balanced') == b.balanced, b.verdict
+			end
+		elseif e == 'full-load' or e == 'full-load-limited' then
+			local b = M.full_load(state)
+			if not b or b.ok == nil then
+				ok, why = false, b and b.verdict or 'the layout has no inputs or no outputs'
+			else
+				ok, why = (e == 'full-load') == b.ok, b.verdict
+			end
+		elseif e == 'same-network' or e == 'different-network' then
+			local path = state.opts.same_network
+			if not path then fail('expect=' .. e .. ' needs the key same network=file') end
+			local b = M.same_network(state, path)
+			if not b or b.ok == nil then
+				ok, why = false, b and b.verdict or 'the belts could not be followed'
+			else
+				ok, why = (e == 'same-network') == b.ok, b.verdict
+			end
 		else
-			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced, input-balanced, input-unbalanced)'
+			ok, why = false, 'unknown value (the values are balanced, unbalanced, lanes, throughput, limited, blocked, blocked-unbalanced, input-balanced, input-unbalanced, lane-balanced, lane-unbalanced, full-load, full-load-limited, same-network, different-network)'
 		end
 		if not ok then tex.error('beltmap: expect=' .. e .. ' fails: ' .. plain(why)) end
 	end
@@ -2373,7 +2533,7 @@ local function finish(getL, alt_override)
 		if bpstring ~= '' and (mode == 'file' or mode == 'attach') then
 			M.bp_count = (M.bp_count or 0) + 1
 			bpfile = (tex.jobname or 'beltmap') .. '-blueprint-' .. M.bp_count .. '.txt'
-			local fh = io.open(bpfile, 'wb')
+			local fh = io.open(output_prefix() .. bpfile, 'wb')
 			if fh then
 				fh:write(bpstring, '\n')
 				fh:close()
@@ -2385,6 +2545,7 @@ local function finish(getL, alt_override)
 	end
 	token.set_macro('beltmapstring', bpstring, 'global')
 	token.set_macro('l__beltmap_bpfile_tl', bpfile)
+	token.set_macro('l__beltmap_outdir_tl', output_prefix())
 	token.set_macro('l__beltmap_auto_alt_tl', current and current.alt or 'Belt layout')
 	local verdict = current and ((current.bal and current.bal.verdict) or current.mix_failed) or ''
 	token.set_macro('beltmapverdict', verdict, 'global')
@@ -2392,6 +2553,9 @@ local function finish(getL, alt_override)
 	token.set_macro('beltmapthroughput', current and current.tp and current.tp.verdict or '', 'global')
 	token.set_macro('beltmapblocked', current and current.blk and current.blk.verdict or '', 'global')
 	token.set_macro('beltmapinputs', current and current.ibal and current.ibal.verdict or '', 'global')
+	token.set_macro('beltmaplanebalance', current and current.lbal and current.lbal.verdict or '', 'global')
+	token.set_macro('beltmapfullload', current and current.full and current.full.verdict or '', 'global')
+	token.set_macro('beltmapsame', current and current.same and current.same.verdict or '', 'global')
 	local okc, cap = pcall(function() return current and M.caption(current) or '' end)
 	token.set_macro('beltmapcaption', okc and cap or '', 'global')
 end
@@ -2473,7 +2637,7 @@ function M.gallery(path)
 		tex.error('beltmap: ' .. (type(err) == 'table' and err.beltmap or tostring(err)))
 		return
 	end
-	local limit = tonumber(topt('limit') or '') or #recs
+	local limit = number('limit', 'limit') or #recs
 	local cols = (tex and tex.count and tex.count['l__beltmap_columns_int']) or 3
 	if cols < 1 then cols = 1 end
 	local lines = {}
@@ -2512,12 +2676,13 @@ function M.book(label)
 		active_index = 0, version = version } }
 	local s = M.encode_blueprint(book)
 	local name = (tex.jobname or 'beltmap') .. '-book.txt'
-	local fh = io.open(name, 'wb')
+	local fh = io.open(output_prefix() .. name, 'wb')
 	if fh then
 		fh:write(s, '\n')
 		fh:close()
 		token.set_macro('l__beltmap_bookfile_tl', name)
 	end
+	token.set_macro('l__beltmap_outdir_tl', output_prefix())
 	token.set_macro('l__beltmap_bookstring_tl', s)
 	texio.write_nl('log', string.format('beltmap: wrote %s with %d blueprints', name, #list))
 end
@@ -2526,6 +2691,133 @@ function M.emit()
 	if not current then return end
 	print_lines(M.tikz(current))
 end
+
+-- ------------------------------------------------------------------ the analysis cache
+-- cache=true keeps the results of the exhaustive tests (max-flow, blocked outputs, full load) in
+-- <jobname>.beltmap-cache between runs.  An entry is keyed by the layout and the test, and the
+-- file by a hash of the code that computes them, so a new version of beltmap starts afresh.  The
+-- file is JSON, read as data; one that cannot be read is ignored.
+
+local cache_data, cache_used, cache_dirty, cache_stamp
+
+local function code_stamp()
+	if cache_stamp ~= nil then return cache_stamp end
+	cache_stamp = false
+	local path
+	if kpse then
+		local ok, hit = pcall(kpse.find_file, 'beltmap-net.lua', 'lua')
+		path = ok and hit or nil
+	end
+	path = path or package.searchpath('beltmap-net', package.path)
+	local fh = path and io.open(path, 'rb')
+	if fh then
+		cache_stamp = md5.sumhexa(fh:read('a'))
+		fh:close()
+	end
+	return cache_stamp
+end
+
+-- JSON that keeps floats to the last bit, exact fractions, and infinity.
+local function ser(v)
+	local t = type(v)
+	if t == 'table' then
+		if getmetatable(v) == getmetatable(NET.q(1, 2)) then
+			return string.format('{"$q":["%d","%d"]}', v.n, v.d)
+		end
+		if v[1] ~= nil then
+			local parts = {}
+			for i, x in ipairs(v) do parts[i] = ser(x) end
+			return '[' .. table.concat(parts, ',') .. ']'
+		end
+		local keys, parts = {}, {}
+		for k in pairs(v) do keys[#keys + 1] = k end
+		table.sort(keys)
+		for i, k in ipairs(keys) do parts[i] = json_encode(k) .. ':' .. ser(v[k]) end
+		return '{' .. table.concat(parts, ',') .. '}'
+	elseif t == 'number' then
+		if v == math.huge then return '{"$inf":true}' end
+		if math.type(v) == 'integer' then return string.format('%d', v) end
+		return string.format('{"$f":"%a"}', v)
+	end
+	return json_encode(v)
+end
+
+local function unser(v)
+	if type(v) ~= 'table' then return v end
+	if v['$q'] then return NET.q(math.tointeger(tonumber(v['$q'][1])), math.tointeger(tonumber(v['$q'][2]))) end
+	if v['$inf'] then return math.huge end
+	if v['$f'] then return tonumber(v['$f']) end
+	for k, x in pairs(v) do v[k] = unser(x) end
+	return v
+end
+M.cache_ser, M.cache_unser = ser, unser
+
+local function cache_file() return output_prefix() .. (tex and tex.jobname or 'beltmap') .. '.beltmap-cache' end
+
+local function cache_load()
+	if cache_data then return end
+	cache_data, cache_used = {}, {}
+	local stamp = code_stamp()
+	local fh = stamp and io.open(cache_file(), 'rb')
+	if not fh then return end
+	local text = fh:read('a')
+	fh:close()
+	local ok, obj = pcall(json_decode, text)
+	if ok and type(obj) == 'table' and obj.stamp == stamp and type(obj.entries) == 'table' then cache_data = obj.entries end
+end
+
+local function layout_key(state)
+	local rows = {}
+	for _, t in pairs(state.L.cells) do rows[#rows + 1] = t.pos.k .. '=' .. signature(t) end
+	table.sort(rows)
+	return md5.sumhexa(table.concat(rows, ';') .. '|' .. tostring(state.opts.gap or state.L.gap or 10))
+end
+
+-- The result of compute(), from the cache when it is on and holds one.
+function M.cached(state, what, compute)
+	if not M.cache_on or not code_stamp() then return compute() end
+	cache_load()
+	local key = md5.sumhexa(what .. '|' .. layout_key(state))
+	local hit = cache_data[key]
+	if hit ~= nil then
+		local ok, value = pcall(unser, hit)
+		if ok then
+			cache_used[key] = hit
+			return value
+		end
+	end
+	local value = compute()
+	if value then
+		local ok, text = pcall(ser, value)
+		if ok then
+			local decoded = json_decode(text)
+			cache_data[key], cache_used[key], cache_dirty = decoded, decoded, true
+		end
+	end
+	return value
+end
+
+-- At the end of the document: keep the entries this run used.
+function M.cache_write()
+	if not cache_data or not cache_stamp then return end
+	local stale = false
+	for key in pairs(cache_data) do
+		if not cache_used[key] then stale = true end
+	end
+	if not cache_dirty and not stale then return end
+	local parts, keys = {}, {}
+	for key in pairs(cache_used) do keys[#keys + 1] = key end
+	table.sort(keys)
+	for i, key in ipairs(keys) do parts[i] = json_encode(key) .. ':' .. ser(cache_used[key]) end
+	local fh = io.open(cache_file(), 'wb')
+	if fh then
+		fh:write('{"stamp":"', cache_stamp, '","entries":{', table.concat(parts, ','), '}}\n')
+		fh:close()
+	end
+end
+
+-- For the tests: forget everything held in memory.
+function M.cache_reset() cache_data, cache_used, cache_dirty = nil, nil, nil end
 
 -- ------------------------------------------------------------------ game icons
 -- beltmap ships no game graphics.  With icons on, it reads them from the reader's own copy of

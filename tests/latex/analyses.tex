@@ -1,0 +1,32 @@
+% Lane balance, full load, and the same-network check, with their expect= values.
+% test: engine=lualatex
+% test: expect=ok
+% test: log-lacks=beltmap warning
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\begin{document}
+\begin{beltgrid}[lane balance, expect=lane-balanced]
+. S> > > v . \\
+> S> v . > > \\
+. . > > ^ .
+\end{beltgrid}
+\beltmaplanebalance
+
+\begin{beltgrid}[expect={lane-unbalanced, full-load}]
+> S> > \\
+> S> >
+\end{beltgrid}
+
+\begin{beltgrid}[full load, expect=full-load-limited]
+> S> > S> > \\
+> S> . S> >
+\end{beltgrid}
+\beltmapfullload
+
+\beltlayout[same network=\examples/f01_9x10.json, expect=same-network]{\examples/f00_9x10.json}
+\beltmapsame
+
+\beltlayout[same network=\examples/f04_11x8.txt, expect=different-network]{\examples/f00_9x10.json}
+\beltmapcaption
+\end{document}
