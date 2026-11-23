@@ -2,18 +2,28 @@ name: release
 
 # A tag v<version> builds the CTAN archive and the manual in the pinned toolchain, checks them
 # as ci.yml does, and publishes a GitHub release with the archive, the manual and SHA256SUMS.
-# The tag must match the version in beltmap.sty (tests/check_repo.py checks it). The CTAN upload
-# itself stays a person's click.
+# The tag must match the version in beltmap.sty. The CTAN upload itself stays a person's click.
+#
+# A run on a tag uses the workflow file of that tag. To publish a tag whose run failed, without
+# moving it, start this workflow by hand on main with the tag as input:
+#     gh workflow run release.yml --ref main -f tag=v0.6
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The existing tag to publish, such as v0.6"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
   CI_IMAGE: ghcr.io/landonfox00/texlib-ci:20261104-b3d4fa5@sha256:4412e258f79649c3f3e2aed1a87635959297cc870281cced384c3cf60790dc28
+  TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
   release:
@@ -21,20 +31,31 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
       - name: The tag matches the package
-        run: python3 tests/check_repo.py
+        run: |
+          python3 tests/check_repo.py
+          version=$(sed -n 's/.*ProvidesExplPackage{beltmap}{[^}]*}{\([^}]*\)}.*/\1/p' beltmap.sty)
+          if [ "$TAG" != "v$version" ]; then
+            echo "tag $TAG does not match the package version $version"
+            exit 1
+          fi
+      # The container runs as root and build/ belongs to it, so every file that goes in build/
+      # is written here; the runner's user can read them and cannot add to the folder.
       - name: Build and check (TeX Live 2026, pinned)
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w "$CI_IMAGE" sh -euc '
             texlua tests/run.lua
             python3 build.py
             python3 tests/check_dist.py
-            "$TEXLIB_VERAPDF_HOME/verapdf" --flavour ua2 build/beltmap/beltmap-doc.pdf | grep -q "isCompliant=\"true\""'
+            "$TEXLIB_VERAPDF_HOME/verapdf" --flavour ua2 build/beltmap/beltmap-doc.pdf | grep -q "isCompliant=\"true\""
+            cp build/beltmap/beltmap-doc.pdf build/beltmap-doc.pdf
+            cd build
+            sha256sum beltmap.zip beltmap-doc.pdf > SHA256SUMS'
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp build/beltmap/beltmap-doc.pdf build/beltmap-doc.pdf
-          (cd build && sha256sum beltmap.zip beltmap-doc.pdf > SHA256SUMS)
-          gh release create "$GITHUB_REF_NAME" build/beltmap.zip build/beltmap-doc.pdf build/SHA256SUMS \
-            --title "beltmap ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release create "$TAG" build/beltmap.zip build/beltmap-doc.pdf build/SHA256SUMS \
+            --verify-tag --title "beltmap ${TAG#v}" --generate-notes
