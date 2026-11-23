@@ -1,0 +1,43 @@
+% Every front end and most keys, in combinations; a picture that cannot be drawn stops the run.
+% test: engine=lualatex
+% test: expect=ok
+% test: log-lacks=beltmap warning
+\documentclass{article}
+\usepackage[margin=1cm]{geometry}
+\usepackage{beltmap}
+\input{paths}
+\begin{document}
+\def\f{\examples/f00_9x10.json}
+\foreach \th in {schematic, dark, transit, print, industrial} {%
+	\beltlayout[theme=\th, tile=2mm]{\f}%
+	\beltlayout[theme=\th, view=graph, tile=2mm]{\f}%
+	\beltlayout[theme=\th, view=wires, mix=strict, marks, tile=2mm]{\f}\par
+}
+\beltlayout[mix, labels, numbers, tile=2mm]{\f}
+\beltlayout[mix=bands, mix lanes, tile=2mm]{\f}
+\beltlayout[mix=strict, marks, demand, tile=2mm]{\f}
+\beltlayout[mix=check, marks, throughput, blocked, tile=2mm]{\f}
+\beltlayout[focus=2, labels, tile=2mm]{\f}
+\beltlayout[palette=okabe-ito, mix, tile=2mm]{\f}
+\beltlayout[palette=lightness, mix, tile=2mm]{\f}
+\beltlayout[grid=strong, grid major=5, rulers, dimensions, tile=2mm]{\f}
+\beltlayout[compare=\examples/f01_9x10.json, tile=2mm]{\f}
+\beltlayout[flow=up, tier=blue, lanes, tile=2mm]{\examples/f04_11x8.txt}
+\beltlayout[flow=left, color=tier, tier=red, tile=2mm]{\examples/f05_11x8.txt}
+\beltlayout[step=3, mix=strict, tile=2mm]{\f}
+\beltlayout[annotate={\draw[red] (tile cs:x=1,y=1) circle (0.4);}, tile=2mm]{\f}
+
+\beltmapverdict\par\beltmapthroughput\par\beltmapblocked\par\beltmapinputs\par\beltmapcaption\par\beltmapmatrix
+
+\beltblueprint[inputs={A,B}, outputs={left, right}]{0eNqtkMEKwjAQRH9F9rxKGxuh+RURaXXVQJqEZCtK6b8bFUWsPYiewmZ2HrPTQW1a8kFbBtWBZmpAvfwhkGXNmiKoZXcfzmvbNjUFUDmCdzHJzl7dJ1DZTCKcb2+PsNWBNne1QLBVQwnOobLRu8DTmgxDjwOsGGDFP7Dz0bT5L9higM2f2GwMG73RzMmOoK1veZ3qdiFhk2Zody3etfwmBL0/fIwgRwv74rIVwpFCvG3JhSiLspRSyMVcZAimSkvJ9EgzeR7Q9xciZMEQ}
+\beltmapprintstring[8cm]
+
+\begin{beltgrid}[mix=check, marks, labels]
+> S>[in=left] > \\
+> S> >
+\end{beltgrid}
+Glyphs: \beltglyph{belt} \beltglyph{splitter} \beltglyph{entrance} \beltglyph{exit} \beltglyph{tunnel}
+\beltglyph{input priority} \beltglyph{output priority} \beltglyph{filter} \beltglyph{side-load}
+
+\beltanimation[tile=1.5mm, grid=false]{\f}
+\end{document}

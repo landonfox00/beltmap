@@ -1,0 +1,13 @@
+% The TikZ library alone runs in any engine (the manual says so).
+% test: engine=xelatex
+% test: expect=ok
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{beltmap}
+\begin{document}
+\begin{tikzpicture}[bm theme=industrial, bm tile=6mm]
+	\draw[bm belt=bmc2] (0,0) -- (3,0);
+	\pic at (1.5,0.5) {bm splitter={right, out=left, trim=red}};
+	\pic at (3.5,0) {bm mark=ok};
+\end{tikzpicture}
+\end{document}

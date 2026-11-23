@@ -1,5 +1,7 @@
 build/
 .leak-patterns
+tests/tmp/
+tests/golden/actual/
 *.aux
 *.log
 *.out

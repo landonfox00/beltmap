@@ -1,0 +1,126 @@
+inputs 2, outputs 3, splitters 2, tunnels 0, exact true
+output 1: 1/2 1/2
+output 2: 1/4 1/4
+output 3: 1/4 1/4
+balance: not balanced: output 1 carries 50\% of input 1, not 33.3\%
+lanes: lanes not kept: the left lane of output 1 carries 50\% of the left lane of input 1, not 33.3\%
+throughput: limited: inputs 1, 2 to outputs 2, 3 get at most 1 of 2 belts (the 2 lanes marked form a cut)
+blocked: stays balanced with any outputs blocked: every open output carries an even share of every input (6 choices, at light load)
+inputs: input balanced: each of the 2 inputs supplies 50\% of every output's demand (at full backpressure)
+wires: none: splitter 2 does not take two belts in and send two out
+alt: Belt layout of 5 by 3 tiles with 2 splitters and 0 underground tunnels; 2 inputs enter on the left and 3 outputs leave on the right. Belts are colored by the inputs they carry; the layout is not balanced: output 1 carries 50 percent of input 1, not 33.3 percent. Throughput: limited: inputs 1, 2 to outputs 2, 3 get at most 1 of 2 belts (the 2 lanes marked form a cut). With outputs blocked: stays balanced with any outputs blocked: every open output carries an even share of every input (6 choices, at light load). Input balance: input balanced: each of the 2 inputs supplies 50 percent of every output's demand (at full backpressure).
+caption: 2--3 \textperiodcentered\ 3$\times$3 \textperiodcentered\ 2 splitters \textperiodcentered\ 0 tunnels \textperiodcentered\ not balanced \textperiodcentered\ throughput limited \textperiodcentered\ balanced when blocked \textperiodcentered\ input balanced
+
+== tikz: layout, mix
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{16,201,222}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{16,201,222}
+\definecolor{bmp2}{RGB}{178,178,178}
+\definecolor{bmp3}{RGB}{178,178,178}
+\definecolor{bmp4}{RGB}{178,178,178}
+\definecolor{bmp5}{RGB}{178,178,178}
+\path[bm grid] (0,0) grid[step=1] (5,-3);
+\path[bm end] (0,0) rectangle (1,-3);
+\path[bm end] (4,0) rectangle (5,-3);
+\path[bm frame] (0,0) rectangle (5,-3);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (1.79,-0.5) -- (5,-0.5);
+\path[bm belt=bmp3] (1.79,-1.5) -- (3.21,-1.5);
+\path[bm belt=bmp4] (3.79,-1.5) -- (5,-1.5);
+\path[bm belt=bmp5] (3.79,-2.5) -- (5,-2.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.75,-0.5) {bm head=right};
+\pic at (2.75,-1.5) {bm head=right};
+\pic at (4.75,-1.5) {bm head=right};
+\pic at (4.75,-2.5) {bm head=right};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (3.5,-2) {bm splitter={right}};
+\node[bm label, anchor=east] at (0,-0.5) {1};
+\node[bm label, anchor=east] at (0,-1.5) {2};
+\node[bm label, anchor=west] at (5,-0.5) {1};
+\node[bm label, anchor=west] at (5,-1.5) {2};
+\node[bm label, anchor=west] at (5,-2.5) {3};
+
+== tikz: layout, strict, marks, throughput
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{16,201,222}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{16,201,222}
+\definecolor{bmp2}{RGB}{206,206,206}
+\definecolor{bmp3}{RGB}{178,178,178}
+\definecolor{bmp4}{RGB}{159,159,159}
+\definecolor{bmp5}{RGB}{159,159,159}
+\path[bm grid] (0,0) grid[step=1] (5,-3);
+\path[bm end] (0,0) rectangle (1,-3);
+\path[bm end] (4,0) rectangle (5,-3);
+\path[bm frame] (0,0) rectangle (5,-3);
+\path[bm cut] (1.79,-1.5) -- (3.21,-1.5);
+\path[bm belt=bmp0] (0,-0.5) -- (1.21,-0.5);
+\path[bm belt=bmp1] (0,-1.5) -- (1.21,-1.5);
+\path[bm belt=bmp2] (1.79,-0.5) -- (5,-0.5);
+\path[bm belt=bmp3] (1.79,-1.5) -- (3.21,-1.5);
+\path[bm belt=bmp4] (3.79,-1.5) -- (5,-1.5);
+\path[bm belt=bmp5] (3.79,-2.5) -- (5,-2.5);
+\pic at (0.75,-0.5) {bm head=right};
+\pic at (0.75,-1.5) {bm head=right};
+\pic at (2.75,-0.5) {bm head=right};
+\pic at (3.75,-0.5) {bm head=right};
+\pic at (4.75,-0.5) {bm head=right};
+\pic at (2.75,-1.5) {bm head=right};
+\pic at (4.75,-1.5) {bm head=right};
+\pic at (4.75,-2.5) {bm head=right};
+\pic at (1.5,-1) {bm splitter={right}};
+\pic at (3.5,-2) {bm splitter={right}};
+\pic at (-0.28,-0.5) {bm mark=ok};
+\pic at (-0.28,-1.5) {bm mark=ok};
+\pic at (5.28,-0.5) {bm mark=bad};
+\pic at (5.28,-1.5) {bm mark=bad};
+\pic at (5.28,-2.5) {bm mark=bad};
+
+== tikz: wires, check, marks
+\definecolor{bmc0}{RGB}{219,120,48}
+\definecolor{bmc1}{RGB}{85,71,178}
+\definecolor{bmc2}{RGB}{49,198,19}
+\definecolor{bmc3}{RGB}{219,48,126}
+\definecolor{bmc4}{RGB}{71,151,178}
+\definecolor{bmc5}{RGB}{198,191,19}
+\definecolor{bmi0}{RGB}{250,145,130}
+\definecolor{bmi1}{RGB}{16,201,222}
+\definecolor{bmp0}{RGB}{250,145,130}
+\definecolor{bmp1}{RGB}{16,201,222}
+\definecolor{bmp2}{RGB}{244,149,135}
+\definecolor{bmp3}{RGB}{178,178,178}
+\definecolor{bmp4}{RGB}{59,72,96}
+\definecolor{bmp5}{RGB}{59,72,96}
+\node[bm g input] (in1) at (0,2.824) {1};
+\node[bm g input] (in2) at (0,-0.833) {2};
+\node[bm g splitter] (s1) at (3.45,0.732) {S1};
+\node[bm g splitter] (s2) at (6.9,-2.506) {S2};
+\node[bm g output] (out1) at (10.35,2.125) {1};
+\node[bm g output] (out2) at (10.35,-2.178) {2};
+\node[bm g output] (out3) at (10.35,-5.271) {3};
+\begin{pgfonlayer}{bmarcs}
+\draw[bm g arc={bmp0}] (in1.east) to[out=0, in=180, looseness=0.8] ([yshift=0.31\bmunit]s1.west);
+\draw[bm g arc={bmp1}] (in2.east) to[out=0, in=180, looseness=0.8] ([yshift=-0.31\bmunit]s1.west);
+\draw[bm g arc={bmp2}] ([yshift=0.31\bmunit]s1.east) to[out=0, in=180, looseness=0.8] (out1.west);
+\draw[bm g arc={bmp3}] ([yshift=-0.31\bmunit]s1.east) to[out=0, in=180, looseness=0.8] (s2.west);
+\draw[bm g arc={bmp4}] ([yshift=0.31\bmunit]s2.east) to[out=0, in=180, looseness=0.8] (out2.west);
+\draw[bm g arc={bmp5}] ([yshift=-0.31\bmunit]s2.east) to[out=0, in=180, looseness=0.8] (out3.west);
+\end{pgfonlayer}

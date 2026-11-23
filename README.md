@@ -2,7 +2,7 @@
 
 Schematic pictures of Factorio belt layouts in LuaLaTeX.
 
-Version 0.5, 2026-11-21.
+Version 0.5.1, 2026-11-21.
 
 `beltmap` draws belt balancers and other belt-and-splitter layouts. It reads Factorio-SAT tile files, Factorio blueprint strings and books (1.1 and 2.0), or a layout typed as a character grid. It traces every belt from splitter to splitter and draws the result in TikZ under one of five themes. On the traced network it computes the exact share of every input on every output, runs a max-flow throughput test, checks the balance with any outputs blocked, colors belts so that gray means balanced (with marks for input and output balance), and draws the splitter graph, or a wire diagram that is the same for every layout of the same network. Game icons come from your own copy of Factorio; the package ships none. Every picture also yields the blueprint string of the layout as drawn, which can be attached to the PDF. In a tagged document every picture gets generated alternative text.
 
@@ -41,6 +41,19 @@ Put `beltmap.sty`, `tikzlibrarybeltmap.code.tex`, `beltmap.lua`, and `beltmap-ne
 ## Source and issues
 
 The source is at <https://github.com/landonfox00/beltmap>; report bugs at <https://github.com/landonfox00/beltmap/issues>. `python build.py` compiles the manual and writes the CTAN archive to `build/beltmap.zip`.
+
+## Tests
+
+The repository (not the CTAN archive) holds the tests that CI runs on every change:
+
+| Command | What it checks |
+|---|---|
+| `python tests/check_repo.py` | Line endings, matching versions, license headers, every key documented, nothing leaked; needs no TeX. |
+| `texlua tests/run.lua` | Shares, verdicts, blocked outputs, demand, colorings, wire diagrams, blueprints, icon lookup, and golden snapshots of everything the package writes. `--update` rewrites the snapshots after an intended change. |
+| `python tests/run_latex.py` | Real documents in LuaLaTeX, pdfLaTeX, and XeLaTeX: refusals, `expect=` failures, tagged output (`--verapdf PATH`), attachments, icons from a fake game folder, the export script. |
+| `python tests/check_dist.py` | The CTAN archive from `build.py`: exactly the shipped files, no images, a complete manual. |
+
+CI runs these on a pinned TeX Live 2026, on TeX Live 2024 (the oldest supported), and on Windows; a weekly job runs them on the newest TeX Live.
 
 ## Known limitations
 

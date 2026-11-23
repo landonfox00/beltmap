@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # The actions are pinned by commit SHA; this proposes the bumps, one pull request a week at most.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

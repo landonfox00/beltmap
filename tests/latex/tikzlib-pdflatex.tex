@@ -1,0 +1,16 @@
+% The TikZ library alone runs in any engine (the manual says so).
+% test: engine=pdflatex
+% test: expect=ok
+\documentclass{article}
+\usepackage{tikz}
+\usetikzlibrary{beltmap}
+\begin{document}
+\begin{tikzpicture}[bm theme=schematic, bm tile=6mm]
+	\draw[bm belt=bmc0] (0,0) -- (3,0);
+	\pic at (1.5,0.5) {bm splitter={right, in=left, filter, out=right}};
+	\pic at (0.5,0) {bm entrance=right};
+	\pic at (2.5,0) {bm exit=right};
+	\pic at (3.5,0) {bm mark=ok};
+	\pic at (3.5,1) {bm mark=bad};
+\end{tikzpicture}
+\end{document}

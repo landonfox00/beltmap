@@ -25,7 +25,7 @@
 %   \usetikzlibrary{beltmap}        the glyphs by hand, in any tikzpicture
 % Reading, tracing and the TikZ code are done in beltmap.lua.  See beltmap-doc.pdf.
 \NeedsTeXFormat{LaTeX2e}[2024-06-01]
-\ProvidesExplPackage{beltmap}{2026-11-21}{0.5}{Schematic pictures of Factorio belt layouts}
+\ProvidesExplPackage{beltmap}{2026-11-21}{0.5.1}{Schematic pictures of Factorio belt layouts}
 
 \sys_if_engine_luatex:F
 	{
@@ -134,9 +134,10 @@
 		focus / none .code:n = { \tl_clear:N \l__beltmap_focus_tl } ,
 		step .tl_set:N = \l__beltmap_step_tl ,
 		palette .choices:nn = { wheel , okabe-ito , lightness , gray } { \tl_set_eq:NN \l__beltmap_palette_tl \l_keys_choice_tl } ,
-		compare .tl_set:N = \l__beltmap_compare_tl ,
+		% file paths are expanded, so that a macro may name a folder
+		compare .code:n = { \tl_set:Ne \l__beltmap_compare_tl {#1} } ,
 		view .choices:nn = { graph , wires } { \tl_set_eq:NN \l__beltmap_view_tl \l_keys_choice_tl } ,
-		factorio~data .tl_set:N = \l__beltmap_factoriodata_tl ,
+		factorio~data .code:n = { \tl_set:Ne \l__beltmap_factoriodata_tl {#1} } ,
 		icons .choices:nn = { true , false } { \tl_set_eq:NN \l__beltmap_icons_tl \l_keys_choice_tl } ,
 		icons .default:n = true ,
 		view / layout .code:n = { \tl_clear:N \l__beltmap_view_tl } ,
@@ -232,7 +233,9 @@
 		\bool_gset_true:N \g__beltmap_book_bool
 		\tl_gset:Nn \g__beltmap_booklabel_tl {#1}
 	}
-\AtEndDocument
+% The book is attached at the end of the document, before embedfile finishes its list of
+% attachments (embedfile's own end-of-document code ran first and refused it otherwise).
+\AddToHook { enddocument } [ beltmap ]
 	{
 		\bool_if:NT \g__beltmap_book_bool
 			{
@@ -240,6 +243,7 @@
 				\__beltmap_attach:NN \l__beltmap_bookstring_tl \l__beltmap_bookfile_tl
 			}
 	}
+\DeclareHookRule { enddocument } { beltmap } { before } { embedfile }
 
 % \beltanimation[keys]{file}: one picture per step of the flow, from empty belts to the steady
 % state, for beltmap_export.py --gif (or the animate package).

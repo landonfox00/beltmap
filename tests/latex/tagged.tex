@@ -1,0 +1,21 @@
+% A tagged document: every picture a figure with alternative text; checked with veraPDF in CI.
+% test: engine=lualatex
+% test: expect=ok
+% test: pdfua=yes
+% test: needs=tagging
+\DocumentMetadata{lang=en-US, pdfstandard=ua-2, pdfversion=2.0, tagging=on, testphase=latest}
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\title{beltmap tagged test}
+\begin{document}
+A balancer, its wire diagram, and a picture with its own alternative text.
+
+\beltlayout[mix=strict, marks]{\examples/f00_9x10.json}
+
+\beltlayout[view=wires, mix=check, marks]{\examples/f04_11x8.txt}
+
+\beltlayout[alt={Two splitters side by side.}]{\examples/f05_11x8.txt}
+
+Inline \beltglyph{splitter} glyph.
+\end{document}

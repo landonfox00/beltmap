@@ -1,0 +1,10 @@
+% expect= must stop the build when the text is wrong about the layout.
+% test: engine=lualatex
+% test: expect=fail
+% test: log-contains=expect=unbalanced fails
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\begin{document}
+\beltlayout[expect=unbalanced]{\examples/f00_9x10.json}
+\end{document}
