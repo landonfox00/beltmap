@@ -6,11 +6,11 @@ output 4: 1/5 1/5 1/5 1/5 1/5
 output 5: 1/5 1/5 1/5 1/5 1/5
 balance: balanced: each of the 5 outputs carries 20\% of each of the 5 inputs
 lanes: lanes kept: each output lane carries 20\% of each input lane on its side, and nothing of the other side
-throughput: passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (961 choices; necessary for throughput-unlimited, not sufficient)
+throughput: passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (251 choices of equal size decide it; necessary for throughput-unlimited, not sufficient)
 blocked: not balanced with output 1 blocked: output 2 carries 40\% of input 1, not 25\% (18 of 30 choices fail, at light load)
 inputs: input balanced: each of the 5 inputs supplies 20\% of every output's demand (at full backpressure)
 wires: 16 0|101134203214312345424512545601623|5|01234
-alt: Belt layout of 9 by 10 tiles with 11 splitters and 3 underground tunnels; 5 inputs enter on the left and 5 outputs leave on the right. Belts are colored by the inputs they carry; the layout is balanced: each of the 5 outputs carries 20 percent of each of the 5 inputs. Throughput: passes the max-flow test: no choice of inputs and outputs is held below min(|I|, |O|) belts by a cut (961 choices; necessary for throughput-unlimited, not sufficient). With outputs blocked: not balanced with output 1 blocked: output 2 carries 40 percent of input 1, not 25 percent (18 of 30 choices fail, at light load). Input balance: input balanced: each of the 5 inputs supplies 20 percent of every output's demand (at full backpressure).
+alt: Belt layout of 9 by 10 tiles with 11 splitters and 3 underground tunnels; 5 inputs enter on the left and 5 outputs leave on the right. Belts are colored by the inputs they carry; the layout is balanced: each of the 5 outputs carries 20 percent of each of the 5 inputs. Throughput: passes the max-flow test: no choice of inputs and outputs is held below min(|I|, |O|) belts by a cut (251 choices of equal size decide it; necessary for throughput-unlimited, not sufficient). With outputs blocked: not balanced with output 1 blocked: output 2 carries 40 percent of input 1, not 25 percent (18 of 30 choices fail, at light load). Input balance: input balanced: each of the 5 inputs supplies 20 percent of every output's demand (at full backpressure).
 caption: 5--5 \textperiodcentered\ 7$\times$10 \textperiodcentered\ 11 splitters \textperiodcentered\ 3 tunnels \textperiodcentered\ balanced \textperiodcentered\ passes max-flow \textperiodcentered\ unbalanced when blocked \textperiodcentered\ input balanced
 
 == tikz: layout, mix

@@ -8,7 +8,9 @@
 - The version and date agree in beltmap.sty, the manual's header and title, and README.md; on a
   tag build ($GITHUB_REF_TYPE=tag) the tag is v<version>.
 - Every shipped source file carries the LPPL header.
-- Every key that beltmap.sty defines is in the manual's table of keys.
+- Every key that beltmap.sty defines is in the manual's table of keys; so is every command,
+  every macro that holds a verdict, and every value of expect.
+- CHANGELOG.md opens with the current version and date.
 - The manual is built with icons=false.
 - No e-mail address, home folder or user path is in a tracked file.
 - Every Python file compiles.
@@ -130,6 +132,28 @@ for k in sorted(keys):
 	if '\\key{' + k + '}' not in doc and '\\key{' + k + '=' not in doc:
 		problem(f'key "{k}" is defined in beltmap.sty but not described in the manual (\\key{{{k}}})')
 print(f'{len(keys)} keys, all documented' if not any('key "' in p for p in problems) else '')
+
+# every command, verdict macro and expect value documented
+commands = set(re.findall(r'\\NewDocumentCommand\s*\\(\w+)', sty))
+commands |= set(re.findall(r'\\tl_new:N \\(beltmap\w+)', sty))
+for name in sorted(commands):
+	if '\\cs{' + name + '}' not in doc and '\\' + name not in doc:
+		problem(f'command \\{name} is defined in beltmap.sty but not described in the manual')
+lua = read('beltmap.lua').decode('utf-8')
+vm = re.search(r"unknown value \(the values are ([^)]*)\)", lua)
+if not vm:
+	problem('beltmap.lua: no list of expect values')
+else:
+	for value in [v.strip() for v in vm.group(1).split(',')]:
+		if '\\key{' + value + '}' not in doc:
+			problem(f'expect={value} is not described in the manual')
+
+# the changelog opens with this version
+if m:
+	log = read('CHANGELOG.md').decode('utf-8') if 'CHANGELOG.md' in files else ''
+	head = re.search(r'^## (\S+) \((\d{4}-\d\d-\d\d)\)', log, re.M)
+	if not head or head.group(1) != version or head.group(2) != date:
+		problem(f'CHANGELOG.md: the first entry is not "## {version} ({date})"')
 
 # the manual must not embed game icons
 if not re.search(r'^\\beltmapset\{icons=false\}', doc, re.M):

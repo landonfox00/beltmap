@@ -1,0 +1,12 @@
+% expect=full-load stops a layout that the fluid model finds limited.
+% test: engine=lualatex
+% test: expect=fail
+% test: log-contains=expect=full-load fails: limited at full load
+\documentclass{article}
+\usepackage{beltmap}
+\begin{document}
+\begin{beltgrid}[expect=full-load]
+> S> > S> > \\
+> S> . S> >
+\end{beltgrid}
+\end{document}

@@ -1,0 +1,14 @@
+% cache: two runs, the second reading the first one's results.
+% test: engine=lualatex
+% test: expect=ok
+% test: runs=2
+% test: file-exists=cache.beltmap-cache
+% test: log-contains=passes the max-flow test
+\documentclass{article}
+\usepackage{beltmap}
+\input{paths}
+\beltmapset{cache}
+\begin{document}
+\beltlayout[throughput, blocked, full load]{\examples/f00_9x10.json}
+\beltmapthroughput
+\end{document}

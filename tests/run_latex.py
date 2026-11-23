@@ -8,7 +8,9 @@ Every tests/latex/*.tex starts with lines `% test: key=value`:
     log-contains=TEXT, log-lacks=TEXT  in the log (TeX's line breaks undone first); repeatable
     pdf-images=N, pdf-images>=N        raster images in the PDF (pdfimages -list)
     attachments>=N                     files attached to the PDF (pdfdetach -list)
-    file-exists=NAME                   a file the run must write beside the PDF
+    file-exists=NAME, file-absent=NAME a file the run must, or must not, write; repeatable
+    output-directory=DIR               compile with -output-directory=DIR
+    runs=N                             compile N times (default 1)
     fixture=factorio                   a fake Factorio data folder, as \\fixturedata
     no-game=yes                        no data folder anywhere (FACTORIO_DATA cleared)
     pdfua=yes                          PDF/UA-2 by veraPDF, when --verapdf is given
@@ -16,7 +18,8 @@ Every tests/latex/*.tex starts with lines `% test: key=value`:
                                        with tagging=on, which LaTeX before 2024-11 does not have)
 Each document runs in its own folder under tests/tmp/latex, with paths.tex defining \\examples
 (the examples folder) and \\fixturedata.  BELTMAP_NO_ICON_SEARCH=1 is set for every run, so no
-result depends on a game installed on the machine.  The export script is checked too.
+result depends on a game installed on the machine.  The export script and the example at the
+top of README.md are checked too.
 
 Exit status 0 when every check passes.  A check that needs a missing tool fails, so CI cannot
 pass by skipping; --allow-missing-tools turns those into skips for a local run.
@@ -63,13 +66,13 @@ def make_fixture(base):
 
 
 def spec_of(path):
-	spec = {'engine': 'lualatex', 'expect': 'ok', 'log-contains': [], 'log-lacks': [], 'file-exists': []}
+	spec = {'engine': 'lualatex', 'expect': 'ok', 'log-contains': [], 'log-lacks': [], 'file-exists': [], 'file-absent': []}
 	for line in open(path, encoding='utf-8'):
 		m = re.match(r'%\s*test:\s*([\w-]+)\s*(>=|=)\s*(.*?)\s*$', line)
 		if not m:
 			continue
 		key, op, val = m.group(1), m.group(2), m.group(3)
-		if key in ('log-contains', 'log-lacks', 'file-exists'):
+		if key in ('log-contains', 'log-lacks', 'file-exists', 'file-absent'):
 			spec[key].append(val)
 		elif op == '>=':
 			spec[key + '>='] = int(val)
@@ -138,12 +141,20 @@ def run_doc(path, run, verapdf, engines, without=()):
 		make_fixture(fixture)
 	with open(os.path.join(work, 'paths.tex'), 'w', encoding='utf-8', newline='\n') as f:
 		f.write('\\def\\examples{%s}\n\\def\\fixturedata{%s}\n' % (os.path.join(ROOT, 'examples').replace('\\', '/'), fixture))
-	r = subprocess.run([spec['engine'], '-interaction=nonstopmode', '-halt-on-error', name + '.tex'], cwd=work,
-		env=env_for(spec), capture_output=True, text=True, errors='replace')
-	logp = os.path.join(work, name + '.log')
+	outdir = spec.get('output-directory')
+	cmd = [spec['engine'], '-interaction=nonstopmode', '-halt-on-error']
+	if outdir:
+		os.makedirs(os.path.join(work, outdir))
+		cmd.append('-output-directory=' + outdir)
+	for _ in range(int(spec.get('runs', 1))):
+		r = subprocess.run(cmd + [name + '.tex'], cwd=work, env=env_for(spec), capture_output=True, text=True, errors='replace')
+		if r.returncode != 0:
+			break
+	built = os.path.join(work, outdir) if outdir else work
+	logp = os.path.join(built, name + '.log')
 	log = open(logp, encoding='utf-8', errors='replace').read() if os.path.exists(logp) else ''
 	flat = log.replace('\n', '') + r.stdout.replace('\n', '')
-	pdf = os.path.join(work, name + '.pdf')
+	pdf = os.path.join(built, name + '.pdf')
 	before = len(run.fails)
 	if spec['expect'] == 'ok':
 		run.check(name, r.returncode == 0 and os.path.exists(pdf), 'expected the run to succeed (exit %d)' % r.returncode)
@@ -155,6 +166,8 @@ def run_doc(path, run, verapdf, engines, without=()):
 		run.check(name, t not in flat, 'log contains: ' + t)
 	for fn in spec['file-exists']:
 		run.check(name, os.path.exists(os.path.join(work, fn)), 'missing file ' + fn)
+	for fn in spec['file-absent']:
+		run.check(name, not os.path.exists(os.path.join(work, fn)), 'file should not be there: ' + fn)
 	if 'pdf-images' in spec or 'pdf-images>=' in spec:
 		if not tool('pdfimages'):
 			run.missing(name, 'pdfimages')
@@ -202,6 +215,28 @@ def run_export(run):
 	print(('ok    ' if ok else 'FAIL  ') + name)
 
 
+def run_readme(run):
+	"""The first LaTeX example of README.md compiles as printed."""
+	name = 'readme-example'
+	if not tool('lualatex'):
+		run.missing(name, 'lualatex')
+		return
+	text = open(os.path.join(ROOT, 'README.md'), encoding='utf-8').read()
+	m = re.search(r'```latex\n(.*?)```', text, re.S)
+	if not run.check(name, m is not None, 'README.md has no LaTeX example'):
+		return
+	preamble, _, body = m.group(1).partition('...\n')
+	work = os.path.join(TMP, name)
+	shutil.rmtree(work, ignore_errors=True)
+	os.makedirs(work)
+	with open(os.path.join(work, 'readme.tex'), 'w', encoding='utf-8', newline='\n') as f:
+		f.write('\\documentclass{article}\n' + preamble + '\\begin{document}\n' + body + '\\end{document}\n')
+	r = subprocess.run(['lualatex', '-interaction=nonstopmode', '-halt-on-error', 'readme.tex'], cwd=work, env=env_for({}),
+		capture_output=True, text=True, errors='replace')
+	ok = run.check(name, r.returncode == 0, 'the README example does not compile: ' + r.stdout[-400:])
+	print(('ok    ' if ok else 'FAIL  ') + name)
+
+
 def main():
 	ap = argparse.ArgumentParser()
 	ap.add_argument('names', nargs='*')
@@ -221,6 +256,8 @@ def main():
 		run_doc(os.path.join(HERE, 'latex', f), run, a.verapdf, engines, without)
 	if not a.no_export and (not a.names or 'export' in a.names):
 		run_export(run)
+	if not a.names or 'readme' in a.names:
+		run_readme(run)
 	print(f'\n{run.passes} checks passed, {len(run.fails)} failed, {run.skips} skipped')
 	for msg in run.fails:
 		print('  - ' + msg)

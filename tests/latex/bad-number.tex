@@ -1,0 +1,12 @@
+% A key that takes a number stops on anything else; it used to be ignored.
+% test: engine=lualatex
+% test: expect=fail
+% test: log-contains=focus=abc: a number is needed
+\documentclass{article}
+\usepackage{beltmap}
+\begin{document}
+\begin{beltgrid}[focus=abc]
+> S> > \\
+> S> >
+\end{beltgrid}
+\end{document}

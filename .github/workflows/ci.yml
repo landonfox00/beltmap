@@ -5,7 +5,9 @@ name: ci
 #   static     no TeX: text hygiene, versions agree, license headers, every key documented,
 #              nothing leaked, no binaries (tests/check_repo.py). Seconds; everything waits on it.
 #   lua        the Lua suite: exact shares, verdicts, blocked outputs, demand, the colorings,
-#              view=wires, blueprints, icon lookup, and the golden snapshots (tests/run.lua).
+#              view=wires, blueprints, icon lookup, the golden snapshots, properties of random
+#              layouts from a fixed seed, and the full-load model against the measurements from
+#              Factorio in tests/game (tests/run.lua).
 #   documents  real documents through real engines: pdfLaTeX and XeLaTeX are refused, the TikZ
 #              library runs anywhere, expect= stops a wrong build, tagged output passes veraPDF,
 #              blueprints attach, icons come from a fake game folder, the export script works
@@ -164,7 +166,7 @@ jobs:
       - name: Lua suite
         run: texlua tests/run.lua
       - name: Documents
-        run: python tests/run_latex.py --allow-missing-tools --no-export engine keys-smoke expect wires-fallback icons-none tikzlib
+        run: python tests/run_latex.py --allow-missing-tools --no-export engine keys-smoke expect wires-fallback icons-none tikzlib outdir analyses bad-number cache
       - name: Keep the runs
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

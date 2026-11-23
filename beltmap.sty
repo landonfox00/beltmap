@@ -25,7 +25,7 @@
 %   \usetikzlibrary{beltmap}        the glyphs by hand, in any tikzpicture
 % Reading, tracing and the TikZ code are done in beltmap.lua.  See beltmap-doc.pdf.
 \NeedsTeXFormat{LaTeX2e}[2024-06-01]
-\ProvidesExplPackage{beltmap}{2026-11-21}{0.5.1}{Schematic pictures of Factorio belt layouts}
+\ProvidesExplPackage{beltmap}{2026-11-23}{0.6}{Schematic pictures of Factorio belt layouts}
 
 \sys_if_engine_luatex:F
 	{
@@ -90,6 +90,14 @@
 \tl_new:N \beltmapblocked
 \tl_new:N \beltmapinputs
 \tl_new:N \beltmapcaption
+\tl_new:N \beltmaplanebalance
+\tl_new:N \beltmapfullload
+\tl_new:N \beltmapsame
+\tl_new:N \l__beltmap_lanebalance_tl
+\tl_new:N \l__beltmap_fullload_tl
+\tl_new:N \l__beltmap_samenetwork_tl
+\tl_new:N \l__beltmap_cache_tl
+\tl_new:N \l__beltmap_outdir_tl
 
 % A key taking true or false, stored as text for beltmap.lua to read.
 \cs_new_protected:Npn \__beltmap_bool_key:n #1
@@ -100,7 +108,7 @@
 				#1 .default:n = true ,
 			}
 	}
-\clist_map_function:nN { ends , heads , lanes , labels , openends , throughput , blocked , marks , demand , numbers , dimensions } \__beltmap_bool_key:n
+\clist_map_function:nN { ends , heads , lanes , labels , openends , throughput , blocked , marks , demand , numbers , dimensions , cache } \__beltmap_bool_key:n
 % grid: true (normal), false (none), faint, or strong; grid major=n, rulers=n, dimensions.
 \keys_define:nn { beltmap }
 	{
@@ -141,6 +149,11 @@
 		icons .choices:nn = { true , false } { \tl_set_eq:NN \l__beltmap_icons_tl \l_keys_choice_tl } ,
 		icons .default:n = true ,
 		view / layout .code:n = { \tl_clear:N \l__beltmap_view_tl } ,
+		lane~balance .choices:nn = { true , false } { \tl_set_eq:NN \l__beltmap_lanebalance_tl \l_keys_choice_tl } ,
+		lane~balance .default:n = true ,
+		full~load .choices:nn = { true , false } { \tl_set_eq:NN \l__beltmap_fullload_tl \l_keys_choice_tl } ,
+		full~load .default:n = true ,
+		same~network .code:n = { \tl_set:Ne \l__beltmap_samenetwork_tl {#1} } ,
 		expect .tl_set:N = \l__beltmap_expect_tl ,
 		columns .int_set:N = \l__beltmap_columns_int ,
 		columns .initial:n = 3 ,
@@ -219,7 +232,7 @@
 		\cs_new_protected:Npn \__beltmap_attach:NN #1#2
 			{
 				\tl_if_empty:NF #2
-					{ \use:e { \exp_not:N \embedfile [ desc = { Factorio~blueprint~string } , mimetype = text/plain ] { #2 } } }
+					{ \use:e { \exp_not:N \embedfile [ filespec = { #2 } , desc = { Factorio~blueprint~string } , mimetype = text/plain ] { \l__beltmap_outdir_tl #2 } } }
 			}
 	}
 
@@ -242,6 +255,7 @@
 				\lua_now:e { beltmap.book('\lua_escape:e { \g__beltmap_booklabel_tl }') }
 				\__beltmap_attach:NN \l__beltmap_bookstring_tl \l__beltmap_bookfile_tl
 			}
+		\lua_now:n { beltmap.cache_write() }
 	}
 \DeclareHookRule { enddocument } { beltmap } { before } { embedfile }
 

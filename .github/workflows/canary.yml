@@ -4,7 +4,8 @@ name: canary
 # by digest so that a check cannot change under a pull request; this job is how a change in TeX
 # Live (a new kernel, tagpdf, TikZ, LuaTeX) reaches us before the pin is moved. A red canary is a
 # heads-up, not a broken main: read the log, fix the package or wait for upstream, then move
-# CI_IMAGE in ci.yml.
+# CI_IMAGE in ci.yml. It also tries a thousand random layouts from a seed of its own; the log
+# prints the seed, and BELTMAP_SEED=<seed> texlua tests/run.lua properties repeats a failure.
 
 on:
   schedule:
@@ -26,6 +27,9 @@ jobs:
             tex --version | head -n 1
             apt-get update -qq && apt-get install -y -qq python3 poppler-utils >/dev/null
             texlua tests/run.lua
+            seed=$(date +%Y%m%d)
+            echo "random layouts: BELTMAP_SEED=$seed"
+            BELTMAP_SEED=$seed BELTMAP_CASES=1000 texlua tests/run.lua properties
             python3 tests/run_latex.py
             python3 build.py
             python3 tests/check_dist.py'

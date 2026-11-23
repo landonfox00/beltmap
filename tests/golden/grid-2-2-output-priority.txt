@@ -3,11 +3,11 @@ output 1: 1 1
 output 2: 0 0
 balance: not balanced: output 1 carries 100\% of input 1, not 50\%
 lanes: lanes not kept: the left lane of output 1 carries 100\% of the left lane of input 1, not 50\%
-throughput: passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (9 choices; necessary for throughput-unlimited, not sufficient)
+throughput: passes the max-flow test: no choice of inputs and outputs is held below min($|I|$, $|O|$) belts by a cut (5 choices of equal size decide it; necessary for throughput-unlimited, not sufficient)
 blocked: stays balanced with any outputs blocked: every open output carries an even share of every input (2 choices, at light load)
 inputs: input balanced: each of the 2 inputs supplies 50\% of every output's demand (at full backpressure)
 wires: 1 |101||01
-alt: Belt layout of 3 by 2 tiles with 1 splitter and 0 underground tunnels; 2 inputs enter on the left and 2 outputs leave on the right. Splitters 1 with output priority. Belts are colored by the inputs they carry; the layout is not balanced: output 1 carries 100 percent of input 1, not 50 percent. Throughput: passes the max-flow test: no choice of inputs and outputs is held below min(|I|, |O|) belts by a cut (9 choices; necessary for throughput-unlimited, not sufficient). With outputs blocked: stays balanced with any outputs blocked: every open output carries an even share of every input (2 choices, at light load). Input balance: input balanced: each of the 2 inputs supplies 50 percent of every output's demand (at full backpressure).
+alt: Belt layout of 3 by 2 tiles with 1 splitter and 0 underground tunnels; 2 inputs enter on the left and 2 outputs leave on the right. Splitters 1 with output priority. Belts are colored by the inputs they carry; the layout is not balanced: output 1 carries 100 percent of input 1, not 50 percent. Throughput: passes the max-flow test: no choice of inputs and outputs is held below min(|I|, |O|) belts by a cut (5 choices of equal size decide it; necessary for throughput-unlimited, not sufficient). With outputs blocked: stays balanced with any outputs blocked: every open output carries an even share of every input (2 choices, at light load). Input balance: input balanced: each of the 2 inputs supplies 50 percent of every output's demand (at full backpressure).
 caption: 2--2 \textperiodcentered\ 1$\times$2 \textperiodcentered\ 1 splitter \textperiodcentered\ 0 tunnels \textperiodcentered\ not balanced \textperiodcentered\ passes max-flow \textperiodcentered\ balanced when blocked \textperiodcentered\ input balanced
 
 == tikz: layout, mix

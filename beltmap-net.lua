@@ -28,6 +28,9 @@
 --                inputs I and outputs O, the most that can pass, and a cut when it falls
 --                short of min(|I|, |O|) belts.  Passing is necessary for throughput-unlimited,
 --                not sufficient: a splitter does not route along a maximum flow.
+--   full_load()  a fluid model of full belts, compared with Factorio in tests/game.
+--   lane_balance()  whether the two lanes of every output carry the same of every input lane.
+--   same_network()  whether two networks are one, up to renaming.
 --   frames()     the shares after t steps of flow, for animations.
 --   graph()      the splitter graph: inputs, splitters, merges, outputs, one arc per piece.
 -- Belts never fill up in shares(); filters are ignored (every item is the same item).
@@ -150,59 +153,85 @@ end
 local LEFT, RIGHT = 1, 2
 N.LEFT, N.RIGHT = LEFT, RIGHT
 
--- A belt is live when what it carries can leave the layout.  blocked: belts known to be full
--- (a loop that only a priority side feeds), which are not live, and neither is anything that
--- leads only into them.
+-- Where belt s side-loads: the tile it joins (w = { belt, tile index }), the near lane it lands
+-- on, and, onto an underground belt, the one incoming lane that gets on.  Measured in Factorio
+-- 2.1.24: the hood blocks the lane on its side, so an entrance takes the upstream lane of the
+-- incoming belt and an exit the downstream lane.
+local function side_target(tr, where, s)
+	local e = s['end']
+	if e[1] ~= 'side' or not e[2] then return nil end
+	local w = where[e[2].k]
+	if not w then return nil end
+	local t = tr.cell[e[2].k]
+	local along = (t.type == 'belt') and t.input_direction or t.direction
+	local lane = (e[3] == (along + 3) % 4) and LEFT or RIGHT
+	local only
+	if t.type ~= 'belt' then
+		-- Coming from the left of the target, the incoming belt's right lane is upstream.
+		local upstream = (lane == LEFT) and RIGHT or LEFT
+		only = t.is_input and upstream or (3 - upstream)
+	end
+	return { w = w, lane = lane, only = only }
+end
+
+-- A lane is live when what it carries can leave the layout, and a belt when either lane is.
+-- blocked: belts known to be full (a loop that only a priority side feeds), which are not live,
+-- and neither is anything that leads only into them.  Returns live[k] and lanes[k][l].
 local function compute_live(tr, where, blocked)
 	local segs = tr.segs
-	local live, changed = {}, true
+	local lanes, changed = {}, true
+	for k in ipairs(segs) do lanes[k] = { false, false } end
 	while changed do
 		changed = false
 		for k, s in ipairs(segs) do
-			if not live[k] and not blocked[k] then
-				local e, v = s['end'], false
-				if e[1] == 'out' then
-					v = true
-				elseif e[1] == 'side' then
-					local w = e[2] and where[e[2].k]
-					v = w and live[w[1]] or false
-				elseif e[1] == 'splitter' then
-					local sp = tr.splitters[tr.splitter_of[e[2].k]]
-					for i = 1, 2 do
-						local t = sp.tiles[i]
-						if t and tr.outof[t.k] and live[tr.outof[t.k]] then v = true end
+			if not blocked[k] then
+				local e = s['end']
+				for l = LEFT, RIGHT do
+					if not lanes[k][l] then
+						local v = false
+						if e[1] == 'out' then
+							v = true
+						elseif e[1] == 'side' then
+							local st = side_target(tr, where, s)
+							v = st and (not st.only or st.only == l) and lanes[st.w[1]][st.lane] or false
+						elseif e[1] == 'splitter' then
+							local sp = tr.splitters[tr.splitter_of[e[2].k]]
+							for i = 1, 2 do
+								local t = sp.tiles[i]
+								if t and tr.outof[t.k] and lanes[tr.outof[t.k]][l] then v = true end
+							end
+						end
+						if v then lanes[k][l], changed = true, true end
 					end
 				end
-				if v then live[k], changed = true, true end
 			end
 		end
 	end
-	return live
+	local live = {}
+	for k in ipairs(segs) do
+		if lanes[k][LEFT] or lanes[k][RIGHT] then live[k] = true end
+	end
+	return live, lanes
 end
 
 function N.build(tr)
-	local cell, segs = tr.cell, tr.segs
+	local segs = tr.segs
 	local where = {}
 	for k, s in ipairs(segs) do
 		for j, c in ipairs(s.tiles) do where[c.k] = { k, j } end
 	end
 	-- Side-loads: which belt joins which tile, onto which lane.
-	local sides, approx = {}, {}
+	local sides = {}
 	for k2, s in ipairs(segs) do
-		local e = s['end']
-		if e[1] == 'side' and e[2] and where[e[2].k] then
-			local w = where[e[2].k]
-			local t = cell[e[2].k]
-			local along = (t.type == 'belt') and t.input_direction or t.direction
-			local lane = (e[3] == (along + 3) % 4) and LEFT or RIGHT
-			if t.type ~= 'belt' then approx[#approx + 1] = 'a side-load onto an underground belt' end
-			local key = w[1] .. ':' .. w[2]
+		local st = side_target(tr, where, s)
+		if st then
+			local key = st.w[1] .. ':' .. st.w[2]
 			sides[key] = sides[key] or {}
-			table.insert(sides[key], { k = k2, lane = lane })
+			table.insert(sides[key], { k = k2, lane = st.lane, only = st.only })
 		end
 	end
 
-	local live = compute_live(tr, where, {})
+	local live, lane_live = compute_live(tr, where, {})
 
 	local pieces, piece_at, first, last = {}, {}, {}, {}
 	for k, s in ipairs(segs) do
@@ -222,7 +251,7 @@ function N.build(tr)
 
 	local sources = {}
 	for k, s in ipairs(segs) do
-		if s.src == nil and #s.tiles > 0 and live[k] then sources[#sources + 1] = k end
+		if s.src == nil and #s.tiles > 0 and live[k] and not sides[k .. ':1'] then sources[#sources + 1] = k end
 	end
 	table.sort(sources, function(a, b) return across(tr.flow)(segs[a].tiles[1], segs[b].tiles[1]) end)
 	local input_of = {}
@@ -239,21 +268,21 @@ function N.build(tr)
 	for o, out in ipairs(outputs) do out.index = o end
 
 	return { tr = tr, pieces = pieces, piece_at = piece_at, first = first, last = last, live = live,
-		sources = sources, input_of = input_of, outputs = outputs, n = #sources, m = #outputs, approx = approx,
-		where = where, blocked = {} }
+		lane_live = lane_live, sources = sources, input_of = input_of, outputs = outputs, n = #sources,
+		m = #outputs, where = where, blocked = {} }
 end
 
--- The share of what enters splitter sp that leaves by its tile t.
-local function share(net, sp, t)
-	local tr, live = net.tr, net.live
+-- The share of what enters splitter sp on lane l that leaves by its tile t.
+local function share(net, sp, t, l)
+	local tr, lanes = net.tr, net.lane_live
 	local open = {}
 	for i = 1, 2 do
 		local u = sp.tiles[i]
-		if u and tr.outof[u.k] and live[tr.outof[u.k]] then open[#open + 1] = u end
+		if u and tr.outof[u.k] and lanes[tr.outof[u.k]][l] then open[#open + 1] = u end
 	end
 	if #open == 0 then return 0, 1 end
 	local prio = (not sp.filter) and sp.output and sp.tiles[sp.output == 'right' and 1 or 2] or nil
-	if prio and tr.outof[prio.k] and live[tr.outof[prio.k]] then return (prio.k == t.k) and 1 or 0, 1 end
+	if prio and tr.outof[prio.k] and lanes[tr.outof[prio.k]][l] then return (prio.k == t.k) and 1 or 0, 1 end
 	for _, u in ipairs(open) do
 		if u.k == t.k then return 1, #open end
 	end
@@ -275,7 +304,7 @@ local function system(net)
 			if net.live[k] then
 				if j == 1 and s.src then
 					local sp = tr.splitters[tr.splitter_of[s.src.k]]
-					local num, den = share(net, sp, s.src)
+					local num, den = share(net, sp, s.src, l)
 					for i = 1, 2 do
 						local u = sp.tiles[i]
 						local qk = u and tr.into[u.k]
@@ -289,8 +318,9 @@ local function system(net)
 				end
 				for _, sd in ipairs(pc.sides) do
 					if sd.lane == l then
-						row[#row + 1] = { idx(net.last[sd.k], LEFT), 1, 1 }
-						row[#row + 1] = { idx(net.last[sd.k], RIGHT), 1, 1 }
+						for l2 = LEFT, RIGHT do
+							if not sd.only or sd.only == l2 then row[#row + 1] = { idx(net.last[sd.k], l2), 1, 1 } end
+						end
 					end
 				end
 			end
@@ -366,7 +396,7 @@ local function settle(net)
 			end
 		end
 		if not trapped then return rows, rhs end
-		net.live = compute_live(net.tr, net.where, net.blocked)
+		net.live, net.lane_live = compute_live(net.tr, net.where, net.blocked)
 		net.full = true
 	end
 	return system(net)
@@ -537,11 +567,25 @@ local function flownet()
 	return G
 end
 
--- For every nonempty set I of inputs and O of outputs (only |I| = |O| when there are more
--- than 4096 choices), the maximum flow in belts with every lane of capacity one.  Returns
--- { tested, limited = { I, O, flow, need, cut = { {piece, lane} } } or nil, rule }.
-function N.throughput(net)
-	if net.tp then return net.tp end
+local THROUGHPUT_MAX = 20000
+N.THROUGHPUT_MAX = THROUGHPUT_MAX
+
+-- n choose k, as a float: a count of choices, compared with a limit.
+local function choose(n, k)
+	local c = 1.0
+	for i = 1, k do c = c * (n - k + i) / i end
+	return math.floor(c + 0.5)
+end
+
+-- The next integer with as many one bits (Gosper's hack), so subsets of one size come in order.
+local function next_subset(x)
+	local c = x & -x
+	local r = x + c
+	return (((r ~ x) >> 2) // c) | r
+end
+
+-- The lane network as a flow graph, with the arcs from the source and to the sink switched off.
+local function flow_graph(net)
 	local tr, segs = net.tr, net.tr.segs
 	local G = flownet()
 	local INF = 1000000
@@ -576,8 +620,9 @@ function N.throughput(net)
 			for _, sd in ipairs(pc.sides) do
 				local q2 = net.last[sd.k]
 				if lout[q2] then
-					G.edge(lout[q2][LEFT], lin[p][sd.lane], INF)
-					G.edge(lout[q2][RIGHT], lin[p][sd.lane], INF)
+					for l2 = LEFT, RIGHT do
+						if not sd.only or sd.only == l2 then G.edge(lout[q2][l2], lin[p][sd.lane], INF) end
+					end
 				end
 			end
 			if p == net.last[k] then
@@ -599,19 +644,38 @@ function N.throughput(net)
 		local p = net.last[out.k]
 		snk_e[o] = { G.edge(lout[p][LEFT], T, 0), G.edge(lout[p][RIGHT], T, 0) }
 	end
+	return G, S, T, src_e, snk_e, lin, lout
+end
+
+-- For every set I of inputs and O of outputs of one size, the maximum flow in belts with every
+-- lane of capacity one, up to THROUGHPUT_MAX choices.  Returns { tested, total, partial,
+-- limited = { I, O, flow, need, short, cut = { {piece, lane} } } or nil }; partial: not every
+-- choice was tried, so a missing limit proves nothing.
+function N.throughput(net)
+	if net.tp then return net.tp end
+	local G, S, T, src_e, snk_e, lin, lout = flow_graph(net)
 	local n, m = net.n, net.m
-	local all = (2 ^ n - 1) * (2 ^ m - 1) <= 4096
 	local function members(mask, size)
 		local list = {}
 		for i = 1, size do if (mask >> (i - 1)) & 1 == 1 then list[#list + 1] = i end end
 		return list
 	end
-	local tested, worst = 0, nil
-	for mi = 1, (1 << n) - 1 do
-		local I = members(mi, n)
-		for mo = 1, (1 << m) - 1 do
-			local O = members(mo, m)
-			if all or #I == #O then
+	-- Choices with |I| = |O| decide all of them.  Flow only grows with I and O, so a choice with
+	-- |I| < |O| carries at least what I carries to any |I| of its outputs, and the same way round;
+	-- and the worst shortfall of any choice is reached by one of equal size.
+	local total = 0.0
+	for k = 1, math.min(n, m) do total = total + choose(n, k) * choose(m, k) end
+	local tested, worst, partial = 0, nil, false
+	for k = 1, math.min(n, m) do
+		local mi, top_i, top_o = (1 << k) - 1, 1 << n, 1 << m
+		while mi < top_i and not partial do
+			local I = members(mi, n)
+			local mo = (1 << k) - 1
+			while mo < top_o do
+				if tested >= THROUGHPUT_MAX then
+					partial = true
+					break
+				end
 				tested = tested + 1
 				for i = 1, n do
 					local on = (mi >> (i - 1)) & 1
@@ -622,11 +686,10 @@ function N.throughput(net)
 					for _, e in ipairs(snk_e[o]) do G.base[e] = on end
 				end
 				G.reset()
-				local need = math.min(#I, #O)
-				local f = G.maxflow(S, T, 2 * need)
-				if f < 2 * need then
-					local short = (2 * need - f) / (2 * need)
-					if not worst or short > worst.short or (short == worst.short and #I + #O < #worst.I + #worst.O) then
+				local f = G.maxflow(S, T, 2 * k)
+				if f < 2 * k then
+					local short = (2 * k - f) / (2 * k)
+					if not worst or short > worst.short then
 						local seen = G.reach(S)
 						local cut = {}
 						for p in pairs(lin) do
@@ -635,14 +698,30 @@ function N.throughput(net)
 							end
 						end
 						table.sort(cut, function(a, b) return a[1] < b[1] or (a[1] == b[1] and a[2] < b[2]) end)
-						worst = { I = I, O = O, flow = f / 2, need = need, short = short, cut = cut }
+						worst = { I = I, O = members(mo, m), flow = f / 2, need = k, short = short, cut = cut }
 					end
 				end
+				mo = next_subset(mo)
 			end
+			mi = next_subset(mi)
 		end
+		if partial then break end
 	end
-	net.tp = { tested = tested, limited = worst, rule = all and 'every' or 'equal' }
+	net.tp = { tested = tested, total = total, limited = worst, partial = partial }
 	return net.tp
+end
+
+-- The maximum flow from inputs I to outputs O, in belts.
+function N.maxflow_of(net, I, O)
+	local G, S, T, src_e, snk_e = flow_graph(net)
+	for _, i in ipairs(I) do
+		for _, e in ipairs(src_e[i]) do G.base[e] = 1 end
+	end
+	for _, o in ipairs(O) do
+		for _, e in ipairs(snk_e[o]) do G.base[e] = 1 end
+	end
+	G.reset()
+	return G.maxflow(S, T, 2 * math.min(#I, #O)) / 2
 end
 
 -- ------------------------------------------------------------------ frames
@@ -1053,7 +1132,7 @@ function N.blocked(tr)
 				open[#open + 1] = out
 			end
 		end
-		net.live = compute_live(tr, net.where, net.blocked)
+		net.live, net.lane_live = compute_live(tr, net.where, net.blocked)
 		tested = tested + 1
 		local x = N.shares(net)
 		local exact = net.exact
@@ -1083,6 +1162,394 @@ function N.blocked(tr)
 		end
 	end
 	return { tested = tested, fails = fails, worst = worst }
+end
+
+-- ------------------------------------------------------------------ lane balance
+
+-- A layout evens the lanes when, on every output, the left and right lanes carry the same amount
+-- of every input lane.  Returns { balanced, worst = { o, i, l, left, right } } or nil.
+function N.lane_balance(net)
+	local x = N.shares(net)
+	if not x then return nil end
+	local worst
+	for _, out in ipairs(net.outputs) do
+		local p = net.last[out.k]
+		for c = 1, 2 * net.n do
+			local a, b = x[p][LEFT][c], x[p][RIGHT][c]
+			local same
+			if net.exact and is_q(a) and is_q(b) then
+				same = (a == b)
+			else
+				same = math.abs(float(a) - float(b)) < 1e-9
+			end
+			if not same then
+				local dev = math.abs(float(a) - float(b))
+				if not worst or dev > worst.dev then
+					worst = { dev = dev, o = out.index, i = (c + 1) // 2, l = 2 - c % 2, left = a, right = b }
+				end
+			end
+		end
+	end
+	return { balanced = (net.n > 0 and net.m > 0 and worst == nil), worst = worst }
+end
+
+-- ------------------------------------------------------------------ full load
+
+-- A fluid model of full belts.  Every lane is a queue that passes at most 1 per step and holds at
+-- most FULL_STORE.  An open input keeps its lanes supplied and an open output takes all it is
+-- offered; a closed output takes nothing.  A straight belt goes before anything side-loading onto
+-- it; side-loads share what room is left.  A splitter works lane by lane: it passes as much as
+-- its inputs offer and its outputs have room for, evenly on each side unless a priority says
+-- otherwise, and what one side cannot take goes to the other.  Filters are ignored.
+local FULL_STORE, FULL_MAX, FULL_TOLERANCE = 2, 4096, 0.004
+N.FULL_MAX = FULL_MAX
+
+local function full_model(net)
+	local tr, segs = net.tr, net.tr.segs
+	local function idx(p, l) return 2 * p - 2 + l end
+	local M = { size = 2 * #net.pieces, prev = {}, side = {}, src = {}, sink = {}, splitters = {} }
+	for p, pc in ipairs(net.pieces) do
+		for l = LEFT, RIGHT do
+			local i = idx(p, l)
+			if pc.j > 1 then
+				M.prev[#M.prev + 1] = { i, idx(net.piece_at[pc.k][pc.j - 1], l) }
+			elseif not segs[pc.k].src and net.input_of[pc.k] then
+				M.src[#M.src + 1] = { i, net.input_of[pc.k] }
+			end
+			local feeders = {}
+			for _, sd in ipairs(pc.sides) do
+				if sd.lane == l then
+					for l2 = LEFT, RIGHT do
+						if not sd.only or sd.only == l2 then feeders[#feeders + 1] = idx(net.last[sd.k], l2) end
+					end
+				end
+			end
+			if #feeders > 0 then M.side[#M.side + 1] = { i, feeders } end
+		end
+	end
+	for _, out in ipairs(net.outputs) do
+		for l = LEFT, RIGHT do M.sink[#M.sink + 1] = { idx(net.last[out.k], l), out.index } end
+	end
+	for _, sp in ipairs(tr.splitters) do
+		local pin = sp.input and (sp.input == 'right' and 1 or 2) or nil
+		local pout = (not sp.filter and sp.output) and (sp.output == 'right' and 1 or 2) or nil
+		for l = LEFT, RIGHT do
+			local e = { pin = pin, pout = pout }
+			for t = 1, 2 do
+				local u = sp.tiles[t]
+				local a, b = u and tr.into[u.k], u and tr.outof[u.k]
+				e['i' .. t] = a and idx(net.last[a], l) or nil
+				e['o' .. t] = b and idx(net.first[b], l) or nil
+			end
+			M.splitters[#M.splitters + 1] = e
+		end
+	end
+	M.steps = 200 + 16 * #net.pieces
+	return M
+end
+
+-- Two amounts adding up to total, at most a and b: all from the first choice when prio names one,
+-- else evenly, with what one side cannot supply taken from the other.
+local function split_two(total, a, b, prio)
+	local x, y
+	if prio == 1 then
+		x = math.min(a, total)
+		y = total - x
+	elseif prio == 2 then
+		y = math.min(b, total)
+		x = total - y
+	else
+		x = math.min(a, total / 2)
+		y = math.min(b, total - x)
+		x = math.min(a, total - y)
+	end
+	return x, y
+end
+
+-- The steady flow, in belts, from the open inputs to the open outputs.
+local function full_run(M, open_in, open_out)
+	local size = M.size
+	local q_, offer, room, o0, r0 = {}, {}, {}, {}, {}
+	for i = 1, size do q_[i] = 0.0 end
+	local recent, W = {}, 32
+	local result
+	for step = 1, M.steps do
+		for i = 1, size do
+			local h = q_[i]
+			local o, r = (h < 1 and h or 1), FULL_STORE - h
+			if r > 1 then r = 1 end
+			offer[i], room[i], o0[i], r0[i] = o, r, o, r
+		end
+		for _, e in ipairs(M.src) do
+			if open_in[e[2]] then room[e[1]] = 0 end
+		end
+		for _, e in ipairs(M.prev) do
+			local g = math.min(offer[e[2]], room[e[1]])
+			offer[e[2]], room[e[1]] = offer[e[2]] - g, room[e[1]] - g
+		end
+		for _, e in ipairs(M.splitters) do
+			local i1, i2, o1, o2 = e.i1, e.i2, e.o1, e.o2
+			local a, b = i1 and offer[i1] or 0, i2 and offer[i2] or 0
+			local c, d = o1 and room[o1] or 0, o2 and room[o2] or 0
+			local total = math.min(a + b, c + d)
+			if total > 0 then
+				local x, y = split_two(total, a, b, e.pin)
+				local u, v = split_two(total, c, d, e.pout)
+				if i1 then offer[i1] = a - x end
+				if i2 then offer[i2] = b - y end
+				if o1 then room[o1] = c - u end
+				if o2 then room[o2] = d - v end
+			end
+		end
+		for _, e in ipairs(M.side) do
+			local left, f = room[e[1]], e[2]
+			for _ = 1, #f do
+				local active = 0
+				for _, w in ipairs(f) do if offer[w] > 1e-12 then active = active + 1 end end
+				if active == 0 or left <= 1e-12 then break end
+				local each = left / active
+				for _, w in ipairs(f) do
+					local g = math.min(offer[w], each)
+					offer[w], left = offer[w] - g, left - g
+				end
+			end
+			room[e[1]] = left
+		end
+		local flow = 0
+		for _, e in ipairs(M.sink) do
+			if open_out[e[2]] then
+				flow = flow + offer[e[1]]
+				offer[e[1]] = 0
+			end
+		end
+		local change = 0
+		for _, e in ipairs(M.src) do
+			-- an open input fills whatever room its lane had
+			if open_in[e[2]] then room[e[1]] = 0 end
+		end
+		for i = 1, size do
+			local d = (r0[i] - room[i]) - (o0[i] - offer[i])
+			q_[i] = q_[i] + d
+			if d > change then change = d elseif -d > change then change = -d end
+		end
+		recent[(step % W) + 1] = flow
+		if change < 1e-7 and step > W then
+			result = flow
+			break
+		end
+	end
+	if not result then
+		local sum = 0
+		for _, v in ipairs(recent) do sum = sum + v end
+		result = sum / #recent
+	end
+	return result / 2
+end
+
+-- The flow of one choice, in belts: for tests and for comparing with the game.
+function N.full_flow(net, I, O)
+	local M = full_model(net)
+	local a, b = {}, {}
+	for _, i in ipairs(I) do a[i] = true end
+	for _, o in ipairs(O) do b[o] = true end
+	return full_run(M, a, b)
+end
+
+-- Every choice of inputs and outputs when there are at most FULL_MAX; otherwise all inputs to all
+-- outputs and then choices of equal size until the limit, and only a shortfall is a verdict.
+-- Returns { tested, total, partial, worst = { I, O, flow, need, short } }.
+function N.full_load(net)
+	local n, m = net.n, net.m
+	local M = full_model(net)
+	local total = (2.0 ^ n - 1) * (2.0 ^ m - 1)
+	local function members(mask, size)
+		local list, set = {}, {}
+		for i = 1, size do
+			if (mask >> (i - 1)) & 1 == 1 then list[#list + 1], set[i] = i, true end
+		end
+		return list, set
+	end
+	local tested, worst = 0, nil
+	local function try(mi, mo)
+		local I, a = members(mi, n)
+		local O, b = members(mo, m)
+		local need = math.min(#I, #O)
+		local f = full_run(M, a, b)
+		tested = tested + 1
+		local short = (need - f) / need
+		if short > FULL_TOLERANCE and (not worst or short > worst.short + 1e-9) then
+			worst = { I = I, O = O, flow = f, need = need, short = short }
+		end
+	end
+	local partial = false
+	if total <= FULL_MAX then
+		for mi = 1, (1 << n) - 1 do
+			for mo = 1, (1 << m) - 1 do try(mi, mo) end
+		end
+	else
+		partial = true
+		if n < 63 and m < 63 then try((1 << n) - 1, (1 << m) - 1) end
+		for k = 1, math.min(n, m) do
+			local mi, top_i, top_o = (1 << k) - 1, 1 << n, 1 << m
+			while mi < top_i and tested < FULL_MAX do
+				local mo = (1 << k) - 1
+				while mo < top_o and tested < FULL_MAX do
+					try(mi, mo)
+					mo = next_subset(mo)
+				end
+				mi = next_subset(mi)
+			end
+		end
+	end
+	return { tested = tested, total = total, partial = partial, worst = worst }
+end
+
+-- ------------------------------------------------------------------ same network
+
+-- The network as a colored multigraph: a node for each input, output, splitter and merge that
+-- has a belt, an arc for each belt.  Arcs are colored by what distinguishes them at their ends:
+-- a priority side, a filter side, and at a merge whether the belt runs straight through,
+-- side-loads, or side-loads with one lane onto an underground belt.
+local function structure(net)
+	local tr, segs = net.tr, net.tr.segs
+	local g = N.graph(net)
+	local used = {}
+	for _, a in ipairs(g.arcs) do used[a[1]], used[a[2]] = true, true end
+	local id, kinds = {}, {}
+	for _, nd in ipairs(g.nodes) do
+		if nd.kind == 'input' or nd.kind == 'output' or used[nd.name] then
+			kinds[#kinds + 1] = nd.kind
+			id[nd.name] = #kinds
+		end
+	end
+	local function color(a)
+		local from, to = '', ''
+		local pc = a[3] and net.pieces[a[3]]
+		if pc and a[1]:sub(1, 1) == 's' then
+			local seg = segs[pc.k]
+			if pc.j == 1 and seg.src then
+				local sp = tr.splitters[tonumber(a[1]:sub(2))]
+				local side = sp.tiles[sp.output == 'right' and 1 or 2]
+				if sp.filter then
+					from = (side and side.k == seg.src.k) and ('f=' .. tostring(sp.filter)) or 'r'
+				elseif sp.output and side and side.k == seg.src.k then
+					from = 'p'
+				end
+			end
+		end
+		local head = a[2]:sub(1, 1)
+		if pc and head == 's' then
+			local sp = tr.splitters[tonumber(a[2]:sub(2))]
+			local e = segs[pc.k]['end']
+			local side = sp.input and sp.tiles[sp.input == 'right' and 1 or 2]
+			if side and e[2] and side.k == e[2].k then to = 'p' end
+		elseif pc and head == 'm' then
+			local p2 = tonumber(a[2]:sub(2))
+			if a.lead or net.pieces[p2].k == pc.k then
+				to = 't'
+			else
+				to = 's'
+				for _, sd in ipairs(net.pieces[p2].sides) do
+					if sd.k == pc.k and sd.only then to = 'u' end
+				end
+			end
+		end
+		return from .. '>' .. to
+	end
+	local arcs = {}
+	for _, a in ipairs(g.arcs) do
+		if id[a[1]] and id[a[2]] then arcs[#arcs + 1] = { id[a[1]], id[a[2]], color(a) } end
+	end
+	return kinds, arcs
+end
+
+local ISO_MAX = 20000
+
+-- Whether two networks are the same up to renaming inputs, outputs, splitters and merges: color
+-- refinement on the two graphs together, then a search over the classes it leaves.  Returns
+-- true, false, or nil when the search ran past ISO_MAX steps.
+function N.same_network(a, b)
+	local ka, aa = structure(a)
+	local kb, ab = structure(b)
+	if #ka ~= #kb or #aa ~= #ab then return false end
+	local na, total = #ka, #ka + #kb
+	local adj, start = {}, {}
+	for v = 1, total do adj[v] = {} end
+	for i, k in ipairs(ka) do start[i] = k end
+	for i, k in ipairs(kb) do start[na + i] = k end
+	local function add(arcs, off)
+		for _, e in ipairs(arcs) do
+			table.insert(adj[e[1] + off], { 'o' .. e[3], e[2] + off })
+			table.insert(adj[e[2] + off], { 'i' .. e[3], e[1] + off })
+		end
+	end
+	add(aa, 0)
+	add(ab, na)
+	local function ranks(sig)
+		local uniq, seen = {}, {}
+		for v = 1, total do
+			if not seen[sig[v]] then seen[sig[v]] = true; uniq[#uniq + 1] = sig[v] end
+		end
+		table.sort(uniq)
+		local r = {}
+		for i, s in ipairs(uniq) do r[s] = i end
+		local col = {}
+		for v = 1, total do col[v] = r[sig[v]] end
+		return col, #uniq
+	end
+	local function refine(col, classes)
+		while true do
+			local sig = {}
+			for v = 1, total do
+				local parts = {}
+				for i, e in ipairs(adj[v]) do parts[i] = e[1] .. ':' .. col[e[2]] end
+				table.sort(parts)
+				sig[v] = col[v] .. '|' .. table.concat(parts, ',')
+			end
+			local nxt, count = ranks(sig)
+			col = nxt
+			if count == classes then return col, count end
+			classes = count
+		end
+	end
+	local steps = 0
+	local function search(col, classes)
+		steps = steps + 1
+		if steps > ISO_MAX then error({ iso_budget = true }, 0) end
+		col, classes = refine(col, classes)
+		local ca, cb = {}, {}
+		for v = 1, na do ca[col[v]] = (ca[col[v]] or 0) + 1 end
+		for v = na + 1, total do cb[col[v]] = (cb[col[v]] or 0) + 1 end
+		for c = 1, classes do
+			if ca[c] ~= cb[c] then return false end
+		end
+		local pick
+		for c = 1, classes do
+			if ca[c] > 1 and (not pick or ca[c] < ca[pick]) then pick = c end
+		end
+		if not pick then return true end
+		local first
+		for v = 1, na do
+			if col[v] == pick then first = v; break end
+		end
+		for v = na + 1, total do
+			if col[v] == pick then
+				local c2 = {}
+				for u = 1, total do c2[u] = col[u] * 2 end
+				c2[first], c2[v] = col[first] * 2 + 1, col[first] * 2 + 1
+				local c3, count = ranks(c2)
+				if search(c3, count) then return true end
+			end
+		end
+		return false
+	end
+	local start_sig = {}
+	for v = 1, total do start_sig[v] = start[v] end
+	local c0, classes = ranks(start_sig)
+	local ok, res = pcall(search, c0, classes)
+	if ok then return res end
+	if type(res) == 'table' and res.iso_budget then return nil end
+	error(res, 0)
 end
 
 -- ------------------------------------------------------------------ the wire diagram
